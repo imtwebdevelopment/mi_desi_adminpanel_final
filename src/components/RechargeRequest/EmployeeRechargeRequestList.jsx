@@ -278,7 +278,7 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
         <div className="card shadow-sm rounded-4">
           <div className="table-responsive" style={{ maxHeight: "70vh" }}>
             <table className="table table-hover align-middle mb-0">
-              <thead className="bg-light">
+              <thead className="bg-light d-none d-md-table-header-group">
                 <tr className="text-muted small">
                   <th>User & Referrer</th>
                   <th>UTR</th>
@@ -292,41 +292,42 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-4">
+                    <td colSpan={7} className="text-center py-4">
                       Loading...
                     </td>
                   </tr>
                 ) : filteredRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-4 text-muted">
+                    <td colSpan={7} className="text-center py-4 text-muted">
                       No records found
                     </td>
                   </tr>
                 ) : (
                   filteredRequests.map((r) => (
-                    <tr key={`${r.userId}-${r.id}`}>
-                      <td>
+                    <tr key={`${r.userId}-${r.id}`} className="position-relative">
+                      {/* Desktop View */}
+                      <td className="d-none d-md-table-cell">
                         <div className="fw-bold">{r.userName}</div>
                         <div className="text-muted small">
                           ID: {r.userId} | Ref: {r.referredBy}
                         </div>
                       </td>
-                      <td>
+                      <td className="d-none d-md-table-cell">
                         <code className="small bg-light px-2 py-1">
                           {r.displayUtr}
                         </code>
                       </td>
-                      <td>{r.number || "N/A"}</td>
-                      <td>₹{r.plan?.price || "—"}</td>
-                      <td>
+                      <td className="d-none d-md-table-cell">{r.number || "N/A"}</td>
+                      <td className="d-none d-md-table-cell">₹{r.plan?.price || "—"}</td>
+                      <td className="d-none d-md-table-cell">
                         {r.rechargeStatus?.toLowerCase() === "pending"
                           ? "NA"
                           : r.triggeredByName || "NA"}
                       </td>
-                      <td>{r.plan?.rechargeProvider || "—"}</td>
-                      <td>
+                      <td className="d-none d-md-table-cell">{r.plan?.rechargeProvider || "—"}</td>
+                      <td className="d-none d-md-table-cell">
                         <select
-                          className="form-select form-select-sm fw-bold mt-1"
+                          className="form-select form-select-sm fw-bold"
                           value={r.rechargeStatus || "Pending"}
                           onChange={(e) =>
                             handleStatusChange(
@@ -341,6 +342,70 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
                           <option value="Success">Success</option>
                           <option value="Rejected">Rejected</option>
                         </select>
+                      </td>
+
+                      {/* Mobile View - Card Layout */}
+                      <td colSpan="7" className="d-md-none p-3">
+                        <div className="border-bottom pb-2 mb-2">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <div className="fw-bold">{r.userName}</div>
+                              <div className="text-muted small">
+                                ID: {r.userId} | Ref: {r.referredBy}
+                              </div>
+                            </div>
+                            <div>
+                              <select
+                                className="form-select form-select-sm fw-bold"
+                                style={{ minWidth: "100px" }}
+                                value={r.rechargeStatus || "Pending"}
+                                onChange={(e) =>
+                                  handleStatusChange(
+                                    r.userId,
+                                    r.id,
+                                    e.target.value
+                                  )
+                                }
+                                disabled={updatingId === r.id}
+                              >
+                                <option value="Pending">Pending</option>
+                                <option value="Success">Success</option>
+                                <option value="Rejected">Rejected</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="row g-2 mt-2">
+                            <div className="col-6">
+                              <div className="small text-muted">UTR</div>
+                              <div>
+                                <code className="small bg-light px-2 py-1">
+                                  {r.displayUtr}
+                                </code>
+                              </div>
+                            </div>
+                            <div className="col-6">
+                              <div className="small text-muted">Mobile</div>
+                              <div>{r.number || "N/A"}</div>
+                            </div>
+                            <div className="col-6">
+                              <div className="small text-muted">Amount</div>
+                              <div>₹{r.plan?.price || "—"}</div>
+                            </div>
+                            <div className="col-6">
+                              <div className="small text-muted">Partner</div>
+                              <div>
+                                {r.rechargeStatus?.toLowerCase() === "pending"
+                                  ? "NA"
+                                  : r.triggeredByName || "NA"}
+                              </div>
+                            </div>
+                            <div className="col-6">
+                              <div className="small text-muted">Company</div>
+                              <div>{r.plan?.rechargeProvider || "—"}</div>
+                            </div>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ))
