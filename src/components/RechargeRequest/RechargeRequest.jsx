@@ -352,7 +352,7 @@ PARTNER UPDATE
           <div className="table-responsive" style={{ maxHeight: "70vh" }}>
 
             <table className="table table-hover align-middle mb-0">
-              <thead className="bg-light">
+              <thead className="bg-light d-none d-md-table-header-group">
                 <tr className="small text-uppercase text-muted">
                   <th className="ps-4">User & Referrer</th>
                   <th>UTR</th>
@@ -366,51 +366,42 @@ PARTNER UPDATE
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="6" className="text-center py-5">
+                    <td colSpan="7" className="text-center py-5">
                       Loading...
+                    </td>
+                  </tr>
+                ) : filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="text-center py-5 text-muted">
+                      No records found
                     </td>
                   </tr>
                 ) : (
                   filteredRequests.map((r) => (
-
-                    <tr key={`${r.userId}-${r.id}`}>
-                      <td className="ps-4">
+                    <tr key={`${r.userId}-${r.id}`} className="position-relative">
+                      {/* Desktop View */}
+                      <td className="ps-4 d-none d-md-table-cell">
                         <div className="fw-bold">{r.userName}</div>
-
-                        <div className="text-muted small d-md-block d-none">
+                        <div className="text-muted small">
                           ID: {r.userId} | Ref: {r.referredBy}
                         </div>
-
-                        {/* MOBILE EXTRA INFO */}
-                        <div className="d-md-none small text-muted">
-                          <div>ID: {r.userId}</div>
-                          <div>Ref: {r.referredBy}</div>
-                        </div>
                       </td>
-
-
-                      <td>
+                      <td className="d-none d-md-table-cell">
                         <code className="small bg-light px-2 py-1">
                           {r.displayUtr}
                         </code>
                       </td>
-
-                      <td>{r.number || "N/A"}</td>
-                      <td>₹{r.plan?.price || "—"}</td>
-
-                      {/* Partner Dropdown */}
-                      <td>
+                      <td className="d-none d-md-table-cell">{r.number || "N/A"}</td>
+                      <td className="d-none d-md-table-cell">₹{r.plan?.price || "—"}</td>
+                      <td className="d-none d-md-table-cell">
                         {r.rechargeStatus?.toLowerCase() === "pending"
                           ? "NA"
                           : r.triggeredByName || "NA"}
                       </td>
-                      {r.plan?.rechargeProvider || "—"}
-
-
-                      {/* Status */}
-                      <td>
+                      <td className="d-none d-md-table-cell">{r.plan?.rechargeProvider || "—"}</td>
+                      <td className="d-none d-md-table-cell">
                         <select
-                          className={`form-select form-select-sm fw-bold mt-1 ${r.rechargeStatus === "Success"
+                          className={`form-select form-select-sm fw-bold ${r.rechargeStatus === "Success"
                             ? "text-success"
                             : r.rechargeStatus === "Rejected"
                               ? "text-danger"
@@ -422,7 +413,6 @@ PARTNER UPDATE
                           }
                           disabled={updatingId === r.id}
                         >
-
                           <option value="Pending">Pending</option>
                           <option value="Success">Success</option>
                           <option value="Rejected">Rejected</option>
@@ -432,8 +422,6 @@ PARTNER UPDATE
                             ❌ {r.rejectedReason}
                           </div>
                         )}
-
-
                         {updatingId === r.id && (
                           <div className="text-muted small mt-1">
                             <span className="spinner-border spinner-border-sm me-1" />
@@ -441,56 +429,133 @@ PARTNER UPDATE
                           </div>
                         )}
                       </td>
+
+                      {/* Mobile View - Card Layout */}
+                      <td colSpan="7" className="d-md-none p-3">
+                        <div className="border-bottom pb-2 mb-2">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <div className="fw-bold">{r.userName}</div>
+                              <div className="text-muted small">
+                                ID: {r.userId} | Ref: {r.referredBy}
+                              </div>
+                            </div>
+                            <div>
+                              <select
+                                className={`form-select form-select-sm fw-bold ${r.rechargeStatus === "Success"
+                                  ? "text-success"
+                                  : r.rechargeStatus === "Rejected"
+                                    ? "text-danger"
+                                    : "text-warning"
+                                }`}
+                                style={{ minWidth: "100px" }}
+                                value={r.rechargeStatus || "Pending"}
+                                onChange={(e) =>
+                                  handleStatusChange(r.userId, r.id, e.target.value)
+                                }
+                                disabled={updatingId === r.id}
+                              >
+                                <option value="Pending">Pending</option>
+                                <option value="Success">Success</option>
+                                <option value="Rejected">Rejected</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="row g-2 mt-2">
+                            <div className="col-6">
+                              <div className="small text-muted">UTR</div>
+                              <div>
+                                <code className="small bg-light px-2 py-1">
+                                  {r.displayUtr}
+                                </code>
+                              </div>
+                            </div>
+                            <div className="col-6">
+                              <div className="small text-muted">Mobile</div>
+                              <div>{r.number || "N/A"}</div>
+                            </div>
+                            <div className="col-6">
+                              <div className="small text-muted">Amount</div>
+                              <div>₹{r.plan?.price || "—"}</div>
+                            </div>
+                            <div className="col-6">
+                              <div className="small text-muted">Partner</div>
+                              <div>
+                                {r.rechargeStatus?.toLowerCase() === "pending"
+                                  ? "NA"
+                                  : r.triggeredByName || "NA"}
+                              </div>
+                            </div>
+                            <div className="col-6">
+                              <div className="small text-muted">Company</div>
+                              <div>{r.plan?.rechargeProvider || "—"}</div>
+                            </div>
+                          </div>
+                          
+                          {r.rechargeStatus === "Rejected" && r.rejectedReason && (
+                            <div className="alert alert-danger py-1 px-2 mt-2 small">
+                              ❌ {r.rejectedReason}
+                            </div>
+                          )}
+                          
+                          {updatingId === r.id && (
+                            <div className="text-muted small mt-1">
+                              <span className="spinner-border spinner-border-sm me-1" />
+                              Updating...
+                            </div>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
-                {rejectModal && (
-                  <div className="modal show d-block" style={{ background: "rgba(0,0,0,0.5)" }}>
-                    <div className="modal-dialog modal-dialog-centered modal-sm">
-
-                      <div className="modal-content rounded-4">
-                        <div className="modal-header">
-                          <h5 className="modal-title text-danger fw-bold">
-                            Reject Recharge
-                          </h5>
-                          <button
-                            className="btn-close"
-                            onClick={() => setRejectModal(null)}
-                          />
-                        </div>
-
-                        <div className="modal-body">
-                          <label className="fw-semibold mb-2">Rejection Reason</label>
-                          <textarea
-                            className="form-control"
-                            rows="3"
-                            placeholder="Enter reason..."
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="modal-footer">
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => setRejectModal(null)}
-                          >
-                            Cancel
-                          </button>
-                          <button className="btn btn-danger" onClick={confirmReject}>
-                            Confirm Reject
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      {rejectModal && (
+        <div className="modal show d-block" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-dialog-centered modal-sm">
+            <div className="modal-content rounded-4">
+              <div className="modal-header">
+                <h5 className="modal-title text-danger fw-bold">
+                  Reject Recharge
+                </h5>
+                <button
+                  className="btn-close"
+                  onClick={() => setRejectModal(null)}
+                />
+              </div>
+
+              <div className="modal-body">
+                <label className="fw-semibold mb-2">Rejection Reason</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  placeholder="Enter reason..."
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setRejectModal(null)}
+                >
+                  Cancel
+                </button>
+                <button className="btn btn-danger" onClick={confirmReject}>
+                  Confirm Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
