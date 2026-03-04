@@ -17,6 +17,7 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Pending"); // Changed from "All" to "Pending"
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
 
@@ -108,6 +109,7 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
   /* ================= FILTER ================= */
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
+      // 1. Search Filter
       const searchMatch =
         r.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.userId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -115,6 +117,13 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
 
       if (!searchMatch) return false;
 
+      // 2. Status Filter - Now defaults to "Pending"
+      if (statusFilter !== "All") {
+        const currentStatus = r.rechargeStatus || "Pending";
+        if (currentStatus !== statusFilter) return false;
+      }
+
+      // 3. Date Filter
       if (!r.requestedDate?.toDate) return true;
 
       const date = r.requestedDate.toDate();
@@ -127,7 +136,7 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
 
       return true;
     });
-  }, [requests, searchTerm, fromDate, toDate]);
+  }, [requests, searchTerm, fromDate, toDate, statusFilter]);
 
   /* ================= STATUS UPDATE ================= */
   const handleStatusChange = async (userId, requestId, newStatus) => {
@@ -236,7 +245,7 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
       <div className="container mt-4">
         <div className="card shadow-sm rounded-4 p-3 mb-4">
           <div className="row g-3 align-items-end">
-            <div className="col-md-4">
+            <div className="col-md-3">
               <h4 className="fw-bold text-primary mb-0">
                 {role === "admin"
                   ? "Recharge Management"
@@ -244,8 +253,34 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
               </h4>
             </div>
 
-            <div className="col-md-4">
-              <label className="small text-muted">From</label>
+            {/* STATUS FILTER - DEFAULT TO PENDING WITH YELLOW BORDER */}
+            <div className="col-md-2">
+              <label className="small text-muted fw-bold">Status Filter</label>
+              <select
+                className={`form-select form-select-sm fw-bold border-2 ${
+                  statusFilter === "Pending" ? "border-warning text-warning" :
+                  statusFilter === "Success" ? "border-success text-success" :
+                  statusFilter === "Rejected" ? "border-danger text-danger" : 
+                  "border-primary text-primary"
+                }`}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  backgroundColor: statusFilter === "Pending" ? "#fff3cd" : 
+                                 statusFilter === "Success" ? "#d1e7dd" :
+                                 statusFilter === "Rejected" ? "#f8d7da" : "white"
+                }}
+              >
+                <option value="All" className="text-dark">All Status</option>
+                <option value="Pending" className="text-warning fw-bold" style={{backgroundColor: "#fff3cd"}}>Pending</option>
+                <option value="Success" className="text-success fw-bold" style={{backgroundColor: "#d1e7dd"}}>Success</option>
+                <option value="Rejected" className="text-danger fw-bold" style={{backgroundColor: "#f8d7da"}}>Rejected</option>
+              </select>
+         
+            </div>
+
+            <div className="col-md-3">
+              <label className="small text-muted">From Date</label>
               <input
                 type="date"
                 className="form-control form-control-sm"
@@ -254,8 +289,8 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
               />
             </div>
 
-            <div className="col-md-4">
-              <label className="small text-muted">To</label>
+            <div className="col-md-3">
+              <label className="small text-muted">To Date</label>
               <input
                 type="date"
                 className="form-control form-control-sm"
@@ -264,12 +299,12 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
               />
             </div>
 
-            <div className="col-md-12 text-end">
+            <div className="col-md-1 text-end">
               <button
-                className="btn btn-success rounded-pill px-4"
+                className="btn btn-success btn-sm rounded-pill w-100"
                 onClick={handleExportExcel}
               >
-                📥 Export Excel
+                📥 Export
               </button>
             </div>
           </div>
@@ -293,13 +328,14 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="text-center py-4">
-                      Loading...
+                      <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                      <span className="ms-2">Loading...</span>
                     </td>
                   </tr>
                 ) : filteredRequests.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-4 text-muted">
-                      No records found
+                      No {statusFilter !== "All" ? statusFilter : ""} records found
                     </td>
                   </tr>
                 ) : (
@@ -327,7 +363,10 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
                       <td className="d-none d-md-table-cell">{r.plan?.rechargeProvider || "—"}</td>
                       <td className="d-none d-md-table-cell">
                         <select
-                          className="form-select form-select-sm fw-bold"
+                          className={`form-select form-select-sm fw-bold ${
+                            r.rechargeStatus === "Success" ? "text-success" : 
+                            r.rechargeStatus === "Rejected" ? "text-danger" : "text-warning"
+                          }`}
                           value={r.rechargeStatus || "Pending"}
                           onChange={(e) =>
                             handleStatusChange(
@@ -337,11 +376,19 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
                             )
                           }
                           disabled={updatingId === r.id}
+                          style={{
+                            backgroundColor: r.rechargeStatus === "Pending" ? "#fff3cd" :
+                                           r.rechargeStatus === "Success" ? "#d1e7dd" :
+                                           r.rechargeStatus === "Rejected" ? "#f8d7da" : "white"
+                          }}
                         >
                           <option value="Pending">Pending</option>
                           <option value="Success">Success</option>
                           <option value="Rejected">Rejected</option>
                         </select>
+                        {r.rechargeStatus === "Rejected" && r.rejectedReason && (
+                          <div className="text-danger small mt-1" style={{fontSize: '10px'}}>⚠ {r.rejectedReason}</div>
+                        )}
                       </td>
 
                       {/* Mobile View - Card Layout */}
@@ -356,8 +403,16 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
                             </div>
                             <div>
                               <select
-                                className="form-select form-select-sm fw-bold"
-                                style={{ minWidth: "100px" }}
+                                className={`form-select form-select-sm fw-bold ${
+                                  r.rechargeStatus === "Success" ? "text-success" : 
+                                  r.rechargeStatus === "Rejected" ? "text-danger" : "text-warning"
+                                }`}
+                                style={{ 
+                                  minWidth: "110px",
+                                  backgroundColor: r.rechargeStatus === "Pending" ? "#fff3cd" :
+                                                 r.rechargeStatus === "Success" ? "#d1e7dd" :
+                                                 r.rechargeStatus === "Rejected" ? "#f8d7da" : "white"
+                                }}
                                 value={r.rechargeStatus || "Pending"}
                                 onChange={(e) =>
                                   handleStatusChange(
@@ -394,7 +449,7 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
                             </div>
                             <div className="col-6">
                               <div className="small text-muted">Partner</div>
-                              <div>
+                              <div className="small">
                                 {r.rechargeStatus?.toLowerCase() === "pending"
                                   ? "NA"
                                   : r.triggeredByName || "NA"}
@@ -402,8 +457,13 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
                             </div>
                             <div className="col-6">
                               <div className="small text-muted">Company</div>
-                              <div>{r.plan?.rechargeProvider || "—"}</div>
+                              <div className="small">{r.plan?.rechargeProvider || "—"}</div>
                             </div>
+                            {r.rechargeStatus === "Rejected" && r.rejectedReason && (
+                              <div className="col-12 text-danger small">
+                                <strong>Reason:</strong> {r.rejectedReason}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -416,6 +476,7 @@ const UnifiedRechargeRequestList = ({ role = "admin" }) => {
         </div>
       </div>
 
+      {/* Reject Modal */}
       {rejectModal && (
         <div
           className="modal show d-block"

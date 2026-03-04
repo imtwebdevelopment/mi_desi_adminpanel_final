@@ -18,14 +18,13 @@ const RechargeRequestList = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Pending"); 
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
 
   /* =========================
     FETCH PARTNERS
   ========================= */
-
-
   useEffect(() => {
     const fetchPartners = async () => {
       try {
@@ -49,10 +48,8 @@ const RechargeRequestList = () => {
   const fetchRechargeRequests = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch customers
       const customersSnap = await getDocs(collection(db, "customers"));
 
-      // 2. Customer lookup
       const customerLookup = {};
       customersSnap.docs.forEach((d) => {
         const data = d.data();
@@ -62,7 +59,6 @@ const RechargeRequestList = () => {
         };
       });
 
-      // 3. Fetch recharge requests for each customer
       const allReqPromises = customersSnap.docs.map(async (customerDoc) => {
         const userId = customerDoc.id;
         const reqSnap = await getDocs(
@@ -79,7 +75,7 @@ const RechargeRequestList = () => {
             partnerId: data.partnerId || "",
             partnerName: data.partnerName || "",
             displayUtr: data.transactionId || data.utrId || "N/A",
-            rechargeProvider: data.plan?.rechargeProvider || "N/A", // ✅ explicit
+            rechargeProvider: data.plan?.rechargeProvider || "N/A",
             ...data,
           };
         });
@@ -88,7 +84,6 @@ const RechargeRequestList = () => {
       const nested = await Promise.all(allReqPromises);
       const allRequests = nested.flat();
 
-      // Sort by date (latest first)
       const sorted = allRequests.sort((a, b) => {
         const d1 = a.requestedDate?.toDate?.() || 0;
         const d2 = b.requestedDate?.toDate?.() || 0;
@@ -107,27 +102,31 @@ const RechargeRequestList = () => {
     fetchRechargeRequests();
   }, [fetchRechargeRequests]);
 
-
+  /* =========================
+    FILTER LOGIC
+  ========================= */
   const filteredRequests = requests.filter((r) => {
     const term = searchTerm.toLowerCase();
-
     const searchMatch =
       r.userName?.toLowerCase().includes(term) ||
       r.userId?.toLowerCase().includes(term) ||
       r.partnerName?.toLowerCase().includes(term) ||
       r.displayUtr?.toLowerCase().includes(term) ||
-      r.plan?.rechargeProvider?.toLowerCase().includes(term)// ✅ add this
+      r.plan?.rechargeProvider?.toLowerCase().includes(term);
 
     if (!searchMatch) return false;
 
-    if (!r.requestedDate?.toDate) return true;
+    if (statusFilter !== "All") {
+      const currentStatus = r.rechargeStatus || "Pending";
+      if (currentStatus !== statusFilter) return false;
+    }
 
+    if (!r.requestedDate?.toDate) return true;
     const reqDate = r.requestedDate.toDate();
     const from = fromDate ? new Date(fromDate) : null;
     const to = toDate ? new Date(toDate) : null;
 
     if (from && reqDate < from) return false;
-
     if (to) {
       const endOfDay = new Date(to);
       endOfDay.setHours(23, 59, 59, 999);
@@ -137,12 +136,10 @@ const RechargeRequestList = () => {
     return true;
   });
 
-
   /* =========================
     STATUS UPDATE
   ========================= */
   const handleStatusChange = async (userId, requestId, newStatus) => {
-    // If rejected → open modal
     if (newStatus === "Rejected") {
       setRejectModal({ userId, requestId });
       return;
@@ -158,7 +155,7 @@ const RechargeRequestList = () => {
 
       await updateDoc(requestRef, {
         rechargeStatus: newStatus,
-        rejectedReason: "", // clear if previously rejected
+        rejectedReason: "",
       });
 
       setRequests((prev) =>
@@ -181,43 +178,6 @@ const RechargeRequestList = () => {
   };
 
   /* =========================
-    PARTNER UPDATE
-  ========================= */
-  /* =========================
-PARTNER UPDATE
-========================= */
-  const handlePartnerChange = async (r, partnerId) => {
-    try {
-      const partner = partners.find((p) => p.id === partnerId);
-      const requestRef = doc(
-        db,
-        `customers/${r.userId}/rechargeRequest`,
-        r.id
-      );
-
-      await updateDoc(requestRef, {
-        partnerId,
-        partnerName: partner?.name || "",
-      });
-
-      setRequests((prev) =>
-        prev.map((req) =>
-          req.id === r.id && req.userId === r.userId
-            ? {
-              ...req,
-              partnerId,
-              partnerName: partner?.name || "",
-            }
-            : req
-        )
-      );
-    } catch (err) {
-      console.error("Error updating partner:", err);
-      alert("Failed to update partner");
-    }
-  };
-
-  /* =========================
     EXCEL EXPORT
   ========================= */
   const handleDownloadExcel = () => {
@@ -225,13 +185,7 @@ PARTNER UPDATE
       "User Name": r.userName,
       "User ID": r.userId,
       "Referred By": r.referredBy,
-
-      // ✅ FIXED Partner Name
-      "Partner Name":
-        r.partnerName && r.partnerName.trim() !== ""
-          ? r.partnerName
-          : "N/A",
-
+      "Partner Name": r.partnerName || "N/A",
       "UTR ID": r.displayUtr,
       "Mobile": r.number || "N/A",
       "Plan Price": r.plan?.price || "N/A",
@@ -256,10 +210,9 @@ PARTNER UPDATE
 
     try {
       setUpdatingId(rejectModal.requestId);
-
       const requestRef = doc(
         db,
-        `customers/${rejectModal.userId}/rechargeRequest`,
+        `customers/${userId}/rechargeRequest`,
         rejectModal.requestId
       );
 
@@ -272,10 +225,10 @@ PARTNER UPDATE
         prev.map((r) =>
           r.id === rejectModal.requestId && r.userId === rejectModal.userId
             ? {
-              ...r,
-              rechargeStatus: "Rejected",
-              rejectedReason: rejectReason,
-            }
+                ...r,
+                rechargeStatus: "Rejected",
+                rejectedReason: rejectReason,
+              }
             : r
         )
       );
@@ -290,26 +243,79 @@ PARTNER UPDATE
     }
   };
 
-  /* =========================
-    UI
-  ========================= */
+  // Status color mapping
+  const getStatusColor = (status) => {
+    switch(status) {
+      case "Pending": return "#ffc107"; // Yellow
+      case "Success": return "#198754"; // Green
+      case "Rejected": return "#dc3545"; // Red
+      default: return "#6c757d"; // Gray
+    }
+  };
+
+  const getStatusBackgroundColor = (status) => {
+    switch(status) {
+      case "Pending": return "#fff3cd"; // Light Yellow
+      case "Success": return "#d1e7dd"; // Light Green
+      case "Rejected": return "#f8d7da"; // Light Red
+      default: return "white";
+    }
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch(status) {
+      case "Success": return "bg-success";
+      case "Rejected": return "bg-danger";
+      case "Pending": return "bg-warning";
+      default: return "bg-secondary";
+    }
+  };
+
+  const getStatusTextClass = (status) => {
+    switch(status) {
+      case "Success": return "text-success";
+      case "Rejected": return "text-danger";
+      case "Pending": return "text-warning";
+      default: return "text-muted";
+    }
+  };
+
   return (
-    <div style={{ backgroundColor: "#f4f7f6", minHeight: "100vh", }}>
+    <div style={{ backgroundColor: "#f4f7f6", minHeight: "100vh" }}>
       <div className="mt-1">
         <FixedHeader onSearchChange={handleSearchChange} />
 
         <div className="bg-white border rounded-3 shadow-sm p-3 mb-4">
           <div className="row g-3 align-items-end">
-
-            {/* TITLE */}
-            <div className="col-12 col-md-4">
-              <h4 className="fw-bold text-primary mb-0">
-                Recharge Management
-              </h4>
+            <div className="col-12 col-md-3">
+              <h4 className="fw-bold text-primary mb-0">Recharge Management</h4>
             </div>
 
-            {/* DATE FILTERS */}
-            <div className="col-12 col-md-5">
+            {/* STATUS FILTER DROPDOWN - NO ICONS */}
+            <div className="col-12 col-md-2">
+              <label className="small text-muted fw-bold">Filter Status</label>
+              <select
+                className="form-select form-select-sm"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  borderLeft: `4px solid ${
+                    statusFilter === "All" ? "#6c757d" : 
+                    statusFilter === "Pending" ? "#ffc107" :
+                    statusFilter === "Success" ? "#198754" : "#dc3545"
+                  }`,
+                  backgroundColor: getStatusBackgroundColor(statusFilter),
+                  fontWeight: "bold"
+                }}
+              >
+                <option value="All">All Requests</option>
+                <option value="Pending" style={{color: "#ffc107", fontWeight: "bold", backgroundColor: "#fff3cd"}}>Pending</option>
+                <option value="Success" style={{color: "#198754", fontWeight: "bold", backgroundColor: "#d1e7dd"}}>Success</option>
+                <option value="Rejected" style={{color: "#dc3545", fontWeight: "bold", backgroundColor: "#f8d7da"}}>Rejected</option>
+              </select>
+            </div>
+
+            <div className="col-12 col-md-4">
               <div className="row g-2">
                 <div className="col-6">
                   <label className="small text-muted">From</label>
@@ -320,7 +326,6 @@ PARTNER UPDATE
                     onChange={(e) => setFromDate(e.target.value)}
                   />
                 </div>
-
                 <div className="col-6">
                   <label className="small text-muted">To</label>
                   <input
@@ -333,7 +338,6 @@ PARTNER UPDATE
               </div>
             </div>
 
-            {/* EXPORT */}
             <div className="col-12 col-md-3 text-md-end">
               <button
                 onClick={handleDownloadExcel}
@@ -342,170 +346,102 @@ PARTNER UPDATE
                 📥 Export Excel
               </button>
             </div>
-
           </div>
         </div>
 
-
-        {/* Table */}
         <div className="card shadow-sm border-0 rounded-4 overflow-hidden">
           <div className="table-responsive" style={{ maxHeight: "70vh" }}>
-
             <table className="table table-hover align-middle mb-0">
               <thead className="bg-light d-none d-md-table-header-group">
                 <tr className="small text-uppercase text-muted">
-                  <th className="ps-4">User & Referrer</th>
-                  <th>UTR</th>
+                  <th className="ps-4">User Details</th>
+                  <th>UTR / Trans ID</th>
                   <th>Mobile</th>
-                  <th>Plan</th>
-                  <th>Partner</th>
+                  <th>Amount</th>
                   <th>Company</th>
-                  <th>Status</th>
+                  <th>Status Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="7" className="text-center py-5">
-                      Loading...
+                    <td colSpan="6" className="text-center py-5">
+                      <div className="spinner-border text-primary" role="status" />
                     </td>
                   </tr>
                 ) : filteredRequests.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="text-center py-5 text-muted">
-                      No records found
+                    <td colSpan="6" className="text-center py-5 text-muted">
+                      No {statusFilter !== "All" ? statusFilter : ""} records found.
                     </td>
                   </tr>
                 ) : (
                   filteredRequests.map((r) => (
-                    <tr key={`${r.userId}-${r.id}`} className="position-relative">
-                      {/* Desktop View */}
+                    <tr key={`${r.userId}-${r.id}`}>
+                      {/* Desktop */}
                       <td className="ps-4 d-none d-md-table-cell">
                         <div className="fw-bold">{r.userName}</div>
-                        <div className="text-muted small">
-                          ID: {r.userId} | Ref: {r.referredBy}
-                        </div>
+                        <div className="text-muted small">ID: {r.userId}</div>
                       </td>
                       <td className="d-none d-md-table-cell">
-                        <code className="small bg-light px-2 py-1">
-                          {r.displayUtr}
-                        </code>
+                        <code className="small bg-light px-2 py-1">{r.displayUtr}</code>
                       </td>
                       <td className="d-none d-md-table-cell">{r.number || "N/A"}</td>
                       <td className="d-none d-md-table-cell">₹{r.plan?.price || "—"}</td>
-                      <td className="d-none d-md-table-cell">
-                        {r.rechargeStatus?.toLowerCase() === "pending"
-                          ? "NA"
-                          : r.triggeredByName || "NA"}
-                      </td>
                       <td className="d-none d-md-table-cell">{r.plan?.rechargeProvider || "—"}</td>
                       <td className="d-none d-md-table-cell">
                         <select
-                          className={`form-select form-select-sm fw-bold ${r.rechargeStatus === "Success"
-                            ? "text-success"
-                            : r.rechargeStatus === "Rejected"
-                              ? "text-danger"
-                              : "text-warning"
-                            }`}
+                          className={`form-select form-select-sm fw-bold ${getStatusTextClass(r.rechargeStatus || "Pending")}`}
                           value={r.rechargeStatus || "Pending"}
-                          onChange={(e) =>
-                            handleStatusChange(r.userId, r.id, e.target.value)
-                          }
+                          onChange={(e) => handleStatusChange(r.userId, r.id, e.target.value)}
                           disabled={updatingId === r.id}
+                          style={{
+                            borderLeft: `4px solid ${getStatusColor(r.rechargeStatus || "Pending")}`,
+                            backgroundColor: getStatusBackgroundColor(r.rechargeStatus || "Pending")
+                          }}
                         >
-                          <option value="Pending">Pending</option>
-                          <option value="Success">Success</option>
-                          <option value="Rejected">Rejected</option>
+                          <option value="Pending" style={{color: "#ffc107", backgroundColor: "#fff3cd"}}>Pending</option>
+                          <option value="Success" style={{color: "#198754", backgroundColor: "#d1e7dd"}}>Success</option>
+                          <option value="Rejected" style={{color: "#dc3545", backgroundColor: "#f8d7da"}}>Rejected</option>
                         </select>
                         {r.rechargeStatus === "Rejected" && r.rejectedReason && (
-                          <div className="alert alert-danger py-1 px-2 mt-2 small">
-                            ❌ {r.rejectedReason}
-                          </div>
-                        )}
-                        {updatingId === r.id && (
-                          <div className="text-muted small mt-1">
-                            <span className="spinner-border spinner-border-sm me-1" />
-                            Updating...
-                          </div>
+                          <div className="text-danger small mt-1">⚠ {r.rejectedReason}</div>
                         )}
                       </td>
 
-                      {/* Mobile View - Card Layout */}
-                      <td colSpan="7" className="d-md-none p-3">
-                        <div className="border-bottom pb-2 mb-2">
-                          <div className="d-flex justify-content-between align-items-start">
-                            <div>
-                              <div className="fw-bold">{r.userName}</div>
-                              <div className="text-muted small">
-                                ID: {r.userId} | Ref: {r.referredBy}
-                              </div>
-                            </div>
-                            <div>
-                              <select
-                                className={`form-select form-select-sm fw-bold ${r.rechargeStatus === "Success"
-                                  ? "text-success"
-                                  : r.rechargeStatus === "Rejected"
-                                    ? "text-danger"
-                                    : "text-warning"
-                                }`}
-                                style={{ minWidth: "100px" }}
-                                value={r.rechargeStatus || "Pending"}
-                                onChange={(e) =>
-                                  handleStatusChange(r.userId, r.id, e.target.value)
-                                }
-                                disabled={updatingId === r.id}
-                              >
-                                <option value="Pending">Pending</option>
-                                <option value="Success">Success</option>
-                                <option value="Rejected">Rejected</option>
-                              </select>
-                            </div>
-                          </div>
-                          
-                          <div className="row g-2 mt-2">
-                            <div className="col-6">
-                              <div className="small text-muted">UTR</div>
-                              <div>
-                                <code className="small bg-light px-2 py-1">
-                                  {r.displayUtr}
-                                </code>
-                              </div>
-                            </div>
-                            <div className="col-6">
-                              <div className="small text-muted">Mobile</div>
-                              <div>{r.number || "N/A"}</div>
-                            </div>
-                            <div className="col-6">
-                              <div className="small text-muted">Amount</div>
-                              <div>₹{r.plan?.price || "—"}</div>
-                            </div>
-                            <div className="col-6">
-                              <div className="small text-muted">Partner</div>
-                              <div>
-                                {r.rechargeStatus?.toLowerCase() === "pending"
-                                  ? "NA"
-                                  : r.triggeredByName || "NA"}
-                              </div>
-                            </div>
-                            <div className="col-6">
-                              <div className="small text-muted">Company</div>
-                              <div>{r.plan?.rechargeProvider || "—"}</div>
-                            </div>
-                          </div>
-                          
-                          {r.rechargeStatus === "Rejected" && r.rejectedReason && (
-                            <div className="alert alert-danger py-1 px-2 mt-2 small">
-                              ❌ {r.rejectedReason}
-                            </div>
-                          )}
-                          
-                          {updatingId === r.id && (
-                            <div className="text-muted small mt-1">
-                              <span className="spinner-border spinner-border-sm me-1" />
-                              Updating...
-                            </div>
-                          )}
+                      {/* Mobile View */}
+                      <td colSpan="6" className="d-md-none p-3">
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div className="fw-bold">{r.userName}</div>
+                          <span className={`badge ${getStatusBadgeClass(r.rechargeStatus || "Pending")} px-3 py-2`}>
+                            {r.rechargeStatus || "Pending"}
+                          </span>
                         </div>
+                        <div className="small mt-2">
+                          <div className="row">
+                            <div className="col-6"><strong>Mobile:</strong> {r.number}</div>
+                            <div className="col-6"><strong>Amount:</strong> ₹{r.plan?.price}</div>
+                            <div className="col-12 mt-1"><strong>UTR:</strong> {r.displayUtr}</div>
+                          </div>
+                        </div>
+                        <select
+                          className="form-select form-select-sm mt-2"
+                          value={r.rechargeStatus || "Pending"}
+                          onChange={(e) => handleStatusChange(r.userId, r.id, e.target.value)}
+                          style={{
+                            borderLeft: `4px solid ${getStatusColor(r.rechargeStatus || "Pending")}`,
+                            backgroundColor: getStatusBackgroundColor(r.rechargeStatus || "Pending")
+                          }}
+                        >
+                          <option value="Pending" style={{color: "#ffc107", backgroundColor: "#fff3cd"}}>Pending</option>
+                          <option value="Success" style={{color: "#198754", backgroundColor: "#d1e7dd"}}>Success</option>
+                          <option value="Rejected" style={{color: "#dc3545", backgroundColor: "#f8d7da"}}>Rejected</option>
+                        </select>
+                        {r.rechargeStatus === "Rejected" && r.rejectedReason && (
+                          <div className="text-danger small mt-2 p-2 bg-light rounded">
+                            <strong>Reason:</strong> {r.rejectedReason}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -516,41 +452,28 @@ PARTNER UPDATE
         </div>
       </div>
 
+      {/* Reject Modal */}
       {rejectModal && (
         <div className="modal show d-block" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="modal-dialog modal-dialog-centered modal-sm">
-            <div className="modal-content rounded-4">
-              <div className="modal-header">
-                <h5 className="modal-title text-danger fw-bold">
-                  Reject Recharge
-                </h5>
-                <button
-                  className="btn-close"
-                  onClick={() => setRejectModal(null)}
-                />
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-danger text-white">
+                <h5 className="modal-title">Reject Recharge Request</h5>
+                <button className="btn-close btn-close-white" onClick={() => setRejectModal(null)}></button>
               </div>
-
               <div className="modal-body">
-                <label className="fw-semibold mb-2">Rejection Reason</label>
+                <label className="fw-bold mb-2">Reason for Rejection</label>
                 <textarea
                   className="form-control"
                   rows="3"
-                  placeholder="Enter reason..."
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="e.g. Invalid UTR, Payment not received, Duplicate request..."
                 />
               </div>
-
               <div className="modal-footer">
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setRejectModal(null)}
-                >
-                  Cancel
-                </button>
-                <button className="btn btn-danger" onClick={confirmReject}>
-                  Confirm Reject
-                </button>
+                <button className="btn btn-secondary" onClick={() => setRejectModal(null)}>Cancel</button>
+                <button className="btn btn-danger" onClick={confirmReject}>Confirm Reject</button>
               </div>
             </div>
           </div>

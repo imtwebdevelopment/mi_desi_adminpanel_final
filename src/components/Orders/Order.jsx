@@ -27,7 +27,6 @@ import { saveAs } from "file-saver";
 import ViewOrderModal from "./ViewOrderPage";
 import "bootstrap/dist/css/bootstrap.min.css";
 
-
 /* -------------------------- CONSTANTS -------------------------- */
 const CUSTOMER_COLLECTION_NAME = "customers";
 const ORDER_SUBCOLLECTION_NAME = "orders";
@@ -46,6 +45,26 @@ const statusClass = (status) => {
       return "bg-danger text-white";
     default:
       return "bg-secondary text-white";
+  }
+};
+
+const getStatusBackgroundColor = (status) => {
+  switch (status) {
+    case "Pending": return "#fff3cd"; // Light Yellow
+    case "Shipped": return "#cfe2ff"; // Light Blue
+    case "Delivered": return "#d1e7dd"; // Light Green
+    case "Canceled": return "#f8d7da"; // Light Red
+    default: return "white";
+  }
+};
+
+const getStatusTextColor = (status) => {
+  switch (status) {
+    case "Pending": return "#ffc107";
+    case "Shipped": return "#0d6efd";
+    case "Delivered": return "#198754";
+    case "Canceled": return "#dc3545";
+    default: return "#6c757d";
   }
 };
 
@@ -90,22 +109,20 @@ const ConfirmDeleteModal = ({ order, onClose, onConfirm }) => {
    ORDER PAGE
 ============================================================= */
 const OrderPage = ({ onNavigate }) => {
-
   const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("Pending"); // Default Pending
 
   const [viewOrder, setViewOrder] = useState(null);
   const [deleteOrder, setDeleteOrder] = useState(null);
   
   const [fromDate, setFromDate] = useState("");
-const [toDate, setToDate] = useState("");
-
-
+  const [toDate, setToDate] = useState("");
 
   const handleFilterOrders = (status) => {
-  setSearchTerm(status);
-};
+    setStatusFilter(status);
+  };
 
   /* -------------------------- FETCH ORDERS -------------------------- */
   const getOrders = useCallback(async () => {
@@ -135,33 +152,31 @@ const [toDate, setToDate] = useState("");
         return orderSnap.docs.map((o) => {
           const data = o.data();
 
- return {
-  ...data,
-  id: data.orderId || o.id,
-  docId: o.id,
-  customerId,
+          return {
+            ...data,
+            id: data.orderId || o.id,
+            docId: o.id,
+            customerId,
 
-  // 👤 CUSTOMER INFO
-  customer: customer.name || "N/A",
-  phone: data.phoneNumber ? String(data.phoneNumber) : "N/A",
+            // 👤 CUSTOMER INFO
+            customer: customer.name || "N/A",
+            phone: data.phoneNumber ? String(data.phoneNumber) : "N/A",
 
-  // 🔗 REFERRED BY ID (THIS WAS MISSING)
-  referredBy: customer.referredBy || "Direct",
+            // 🔗 REFERRED BY ID
+            referredBy: customer.referredBy || "Direct",
 
-  // 💳 UTR
-  utr:
-    data.transactionId ||
-    data.transactionData?.transactionId ||
-    "N/A",
+            // 💳 UTR
+            utr:
+              data.transactionId ||
+              data.transactionData?.transactionId ||
+              "N/A",
 
- date: data.createdAt?.toDate().toISOString() || data.date || null,
+            date: data.createdAt?.toDate().toISOString() || data.date || null,
 
-  total: (data.totalAmount || data.total || 0).toFixed(2),
-  items: data.products?.length || 0,
-  status: data.status || "Pending",
-};
-
-
+            total: (data.totalAmount || data.total || 0).toFixed(2),
+            items: data.products?.length || 0,
+            status: data.status || "Pending",
+          };
         });
       });
 
@@ -193,56 +208,55 @@ const [toDate, setToDate] = useState("");
     });
   };
 
-const downloadOrdersExcel = () => {
-  if (filteredOrders.length === 0) {
-    alert("No orders to export");
-    return;
-  }
+  const downloadOrdersExcel = () => {
+    if (filteredOrders.length === 0) {
+      alert("No orders to export");
+      return;
+    }
 
-  // Convert date strings to Date objects
-  const from = fromDate ? new Date(fromDate) : null;
-  const to = toDate ? new Date(toDate) : null;
+    // Convert date strings to Date objects
+    const from = fromDate ? new Date(fromDate) : null;
+    const to = toDate ? new Date(toDate) : null;
 
-  // Filter by date range
-  const ordersToExport = filteredOrders.filter((o) => {
-    if (!o.date) return false;
+    // Filter by date range
+    const ordersToExport = filteredOrders.filter((o) => {
+      if (!o.date) return false;
 
-    const orderDate = new Date(o.date); // assuming o.date is in a format like "YYYY-MM-DD"
-    
-    if (from && orderDate < from) return false;
-    if (to && orderDate > to) return false;
+      const orderDate = new Date(o.date);
+      
+      if (from && orderDate < from) return false;
+      if (to && orderDate > to) return false;
 
-    return true;
-  });
+      return true;
+    });
 
-  if (ordersToExport.length === 0) {
-    alert("No orders found in the selected date range");
-    return;
-  }
+    if (ordersToExport.length === 0) {
+      alert("No orders found in the selected date range");
+      return;
+    }
 
-  const excelData = ordersToExport.map((o) => ({
-    "Order ID": o.id,
-    "Customer Name": o.customer,
-    "Customer ID": o.customerId,
-    "Referred By": o.referredBy,
-    "Phone": o.phone,
-    "UTR": o.utr,
-    "Items": o.items,
-    "Total Amount": o.total,
-    "Status": o.status,
-    "Order Date": o.date,
-  }));
+    const excelData = ordersToExport.map((o) => ({
+      "Order ID": o.id,
+      "Customer Name": o.customer,
+      "Customer ID": o.customerId,
+      "Referred By": o.referredBy,
+      "Phone": o.phone,
+      "UTR": o.utr,
+      "Items": o.items,
+      "Total Amount": o.total,
+      "Status": o.status,
+      "Order Date": o.date,
+    }));
 
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Orders Report");
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Orders Report");
 
-  XLSX.writeFile(
-    workbook,
-    `Orders_Report_${new Date().toISOString().slice(0, 10)}.xlsx`
-  );
-};
-
+    XLSX.writeFile(
+      workbook,
+      `Orders_Report_${new Date().toISOString().slice(0, 10)}.xlsx`
+    );
+  };
 
   /* -------------------------- EXTRACT PRODUCT DATA -------------------------- */
   const extractProductData = (item) => {
@@ -633,12 +647,22 @@ const downloadOrdersExcel = () => {
     }
   };
 
-  /* -------------------------- SEARCH FILTER -------------------------- */
-  const filteredOrders = orders.filter((o) =>
-    (o.id + o.customer + o.status)
+  /* -------------------------- SEARCH & STATUS FILTER -------------------------- */
+  const filteredOrders = orders.filter((o) => {
+    // Search filter
+    const searchMatch = (o.id + o.customer + o.status)
       .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+      .includes(searchTerm.toLowerCase());
+
+    if (!searchMatch) return false;
+
+    // Status filter - Default to Pending
+    if (statusFilter !== "All") {
+      return o.status === statusFilter;
+    }
+
+    return true;
+  });
 
   /* -------------------------- LOADING -------------------------- */
   if (loading) {
@@ -652,7 +676,6 @@ const downloadOrdersExcel = () => {
     );
   }
 
-
   /* =============================================================
      RENDER UI
   ============================================================= */
@@ -664,264 +687,289 @@ const downloadOrdersExcel = () => {
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="fw-bold text-primary mb-0">Order Management</h2>
 
-<div className="d-flex align-items-center gap-2 mb-3">
-  <input
-    type="date"
-    className="form-control form-control-sm"
-    value={fromDate}
-    onChange={(e) => setFromDate(e.target.value)}
-    placeholder="From Date"
-  />
-  <input
-    type="date"
-    className="form-control form-control-sm"
-    value={toDate}
-    onChange={(e) => setToDate(e.target.value)}
-    placeholder="To Date"
-  />
-  <button
-    className="btn btn-outline-success btn-sm"
-    onClick={downloadOrdersExcel}
-  >
-    📊 Export Orders
-  </button>
-</div>
-
-
-        </div>
-
-      {/* Order Stats */}
-<div className="row g-4 mb-4">
-
-
-  {/* Pending Orders */}
-  <div className="col-xl-3 col-lg-4 col-md-6">
-    <div 
-      className="card border-0 shadow-sm cursor-pointer hover-lift"
-      onClick={() => handleFilterOrders('Pending')}
-      style={{
-        background: 'linear-gradient(135deg, #f59e0b15 0%, transparent 100%)',
-        borderLeft: '4px solid #f59e0b',
-        transition: 'all 0.3s ease',
-      }}
-    >
-      <div className="card-body p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <div className="p-3 rounded-circle" style={{ background: '#f59e0b20' }}>
-            <RiTimeLine size={24} color="#f59e0b" />
-          </div>
-          <span className="text-muted small">
-            <RiAlertLine className="me-1" />
-            Needs attention
-          </span>
-        </div>
-        <h2 className="fw-bold display-6 mb-1" style={{ color: '#f59e0b' }}>
-          {orders.filter(o => o.status === "Pending").length}
-        </h2>
-        <p className="text-muted mb-0">Pending Orders</p>
-        <div className="mt-3">
-          <div className="progress" style={{ height: '4px' }}>
-            <div 
-              className="progress-bar" 
-              style={{ 
-                width: `${orders.length > 0 ? (orders.filter(o => o.status === "Pending").length / orders.length * 100) : 0}%`,
-                backgroundColor: '#f59e0b'
+          <div className="d-flex align-items-center gap-2">
+            {/* STATUS FILTER DROPDOWN - DEFAULT PENDING (NO ICONS) */}
+            <select
+              className="form-select form-select-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                minWidth: "140px",
+                borderLeft: `4px solid ${getStatusTextColor(statusFilter)}`,
+                backgroundColor: getStatusBackgroundColor(statusFilter),
+                fontWeight: "bold"
               }}
-            ></div>
-          </div>
-          <small className="text-muted mt-1 d-block">
-            {orders.length > 0 ? Math.round((orders.filter(o => o.status === "Pending").length / orders.length * 100)) : 0}% of total
-          </small>
-        </div>
-      </div>
-    </div>
-  </div>
+            >
+              <option value="All" className="text-dark">All Status</option>
+              <option value="Pending" className="text-warning fw-bold" style={{backgroundColor: "#fff3cd"}}>Pending</option>
+              <option value="Shipped" className="text-info fw-bold" style={{backgroundColor: "#cfe2ff"}}>Shipped</option>
+              <option value="Delivered" className="text-success fw-bold" style={{backgroundColor: "#d1e7dd"}}>Delivered</option>
+              <option value="Canceled" className="text-danger fw-bold" style={{backgroundColor: "#f8d7da"}}>Canceled</option>
+            </select>
 
-  {/* Shipped Orders */}
-  <div className="col-xl-3 col-lg-4 col-md-6">
-    <div 
-      className="card border-0 shadow-sm cursor-pointer hover-lift"
-      onClick={() => handleFilterOrders('Shipped')}
-      style={{
-        background: 'linear-gradient(135deg, #0ea5e915 0%, transparent 100%)',
-        borderLeft: '4px solid #0ea5e9',
-        transition: 'all 0.3s ease',
-      }}
-    >
-      <div className="card-body p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <div className="p-3 rounded-circle" style={{ background: '#0ea5e920' }}>
-            <RiTruckLine size={24} color="#0ea5e9" />
+            <input
+              type="date"
+              className="form-control form-control-sm"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              placeholder="From Date"
+            />
+            <input
+              type="date"
+              className="form-control form-control-sm"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              placeholder="To Date"
+            />
+            <button
+              className="btn btn-outline-success btn-sm"
+              onClick={downloadOrdersExcel}
+            >
+              📊 Export Orders
+            </button>
           </div>
-          <span className="text-success small fw-semibold">
-            <RiArrowUpLine className="me-1" />
-            In transit
-          </span>
         </div>
-        <h2 className="fw-bold display-6 mb-1" style={{ color: '#0ea5e9' }}>
-          {orders.filter(o => o.status === "Shipped").length}
-        </h2>
-        <p className="text-muted mb-0">Shipped Orders</p>
-        <div className="mt-3">
-          <div className="progress" style={{ height: '4px' }}>
+
+        {/* Order Stats with Filter Indicators */}
+        <div className="row g-4 mb-4">
+          {/* Pending Orders */}
+          <div className="col-xl-3 col-lg-4 col-md-6">
             <div 
-              className="progress-bar" 
-              style={{ 
-                width: `${orders.length > 0 ? (orders.filter(o => o.status === "Shipped").length / orders.length * 100) : 0}%`,
-                backgroundColor: '#0ea5e9'
+              className="card border-0 shadow-sm cursor-pointer hover-lift"
+              onClick={() => handleFilterOrders('Pending')}
+              style={{
+                background: statusFilter === 'Pending' ? 'linear-gradient(135deg, #f59e0b30 0%, #f59e0b10 100%)' : 'linear-gradient(135deg, #f59e0b15 0%, transparent 100%)',
+                borderLeft: `4px solid #f59e0b`,
+                transform: statusFilter === 'Pending' ? 'translateY(-2px)' : 'none',
+                boxShadow: statusFilter === 'Pending' ? '0 8px 16px rgba(245, 158, 11, 0.2)' : 'none',
+                transition: 'all 0.3s ease',
               }}
-            ></div>
+            >
+              <div className="card-body p-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className="p-3 rounded-circle" style={{ background: '#f59e0b20' }}>
+                    <RiTimeLine size={24} color="#f59e0b" />
+                  </div>
+                  {statusFilter === 'Pending' && (
+                    <span className="badge bg-warning text-dark">Active Filter</span>
+                  )}
+                </div>
+                <h2 className="fw-bold display-6 mb-1" style={{ color: '#f59e0b' }}>
+                  {orders.filter(o => o.status === "Pending").length}
+                </h2>
+                <p className="text-muted mb-0">Pending Orders</p>
+                <div className="mt-3">
+                  <div className="progress" style={{ height: '4px' }}>
+                    <div 
+                      className="progress-bar" 
+                      style={{ 
+                        width: `${orders.length > 0 ? (orders.filter(o => o.status === "Pending").length / orders.length * 100) : 0}%`,
+                        backgroundColor: '#f59e0b'
+                      }}
+                    ></div>
+                  </div>
+                  <small className="text-muted mt-1 d-block">
+                    {orders.length > 0 ? Math.round((orders.filter(o => o.status === "Pending").length / orders.length * 100)) : 0}% of total
+                  </small>
+                </div>
+              </div>
+            </div>
           </div>
-          <small className="text-muted mt-1 d-block">
-            {orders.length > 0 ? Math.round((orders.filter(o => o.status === "Shipped").length / orders.length * 100)) : 0}% of total
-          </small>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  {/* Delivered Orders */}
-  <div className="col-xl-3 col-lg-4 col-md-6">
-    <div 
-      className="card border-0 shadow-sm cursor-pointer hover-lift"
-      onClick={() => handleFilterOrders('Delivered')}
-      style={{
-        background: 'linear-gradient(135deg, #10b98115 0%, transparent 100%)',
-        borderLeft: '4px solid #10b981',
-        transition: 'all 0.3s ease',
-      }}
-    >
-      <div className="card-body p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <div className="p-3 rounded-circle" style={{ background: '#10b98120' }}>
-            <RiCheckboxCircleLine size={24} color="#10b981" />
-          </div>
-          <span className="text-success small fw-semibold">
-            <RiCheckLine className="me-1" />
-            Completed
-          </span>
-        </div>
-        <h2 className="fw-bold display-6 mb-1" style={{ color: '#10b981' }}>
-          {orders.filter(o => o.status === "Delivered").length}
-        </h2>
-        <p className="text-muted mb-0">Delivered Orders</p>
-        <div className="mt-3">
-          <div className="progress" style={{ height: '4px' }}>
+          {/* Shipped Orders */}
+          <div className="col-xl-3 col-lg-4 col-md-6">
             <div 
-              className="progress-bar" 
-              style={{ 
-                width: `${orders.length > 0 ? (orders.filter(o => o.status === "Delivered").length / orders.length * 100) : 0}%`,
-                backgroundColor: '#10b981'
+              className="card border-0 shadow-sm cursor-pointer hover-lift"
+              onClick={() => handleFilterOrders('Shipped')}
+              style={{
+                background: statusFilter === 'Shipped' ? 'linear-gradient(135deg, #0ea5e930 0%, #0ea5e910 100%)' : 'linear-gradient(135deg, #0ea5e915 0%, transparent 100%)',
+                borderLeft: `4px solid #0ea5e9`,
+                transform: statusFilter === 'Shipped' ? 'translateY(-2px)' : 'none',
+                boxShadow: statusFilter === 'Shipped' ? '0 8px 16px rgba(14, 165, 233, 0.2)' : 'none',
+                transition: 'all 0.3s ease',
               }}
-            ></div>
+            >
+              <div className="card-body p-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className="p-3 rounded-circle" style={{ background: '#0ea5e920' }}>
+                    <RiTruckLine size={24} color="#0ea5e9" />
+                  </div>
+                  {statusFilter === 'Shipped' && (
+                    <span className="badge bg-info text-white">Active Filter</span>
+                  )}
+                </div>
+                <h2 className="fw-bold display-6 mb-1" style={{ color: '#0ea5e9' }}>
+                  {orders.filter(o => o.status === "Shipped").length}
+                </h2>
+                <p className="text-muted mb-0">Shipped Orders</p>
+                <div className="mt-3">
+                  <div className="progress" style={{ height: '4px' }}>
+                    <div 
+                      className="progress-bar" 
+                      style={{ 
+                        width: `${orders.length > 0 ? (orders.filter(o => o.status === "Shipped").length / orders.length * 100) : 0}%`,
+                        backgroundColor: '#0ea5e9'
+                      }}
+                    ></div>
+                  </div>
+                  <small className="text-muted mt-1 d-block">
+                    {orders.length > 0 ? Math.round((orders.filter(o => o.status === "Shipped").length / orders.length * 100)) : 0}% of total
+                  </small>
+                </div>
+              </div>
+            </div>
           </div>
-          <small className="text-muted mt-1 d-block">
-            {orders.length > 0 ? Math.round((orders.filter(o => o.status === "Delivered").length / orders.length * 100)) : 0}% of total
-          </small>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  {/* Cancelled Orders */}
-  <div className="col-xl-3 col-lg-4 col-md-6">
-    <div 
-      className="card border-0 shadow-sm cursor-pointer hover-lift"
-      onClick={() => handleFilterOrders('Canceled')}
-      style={{
-        background: 'linear-gradient(135deg, #ef444415 0%, transparent 100%)',
-        borderLeft: '4px solid #ef4444',
-        transition: 'all 0.3s ease',
-      }}
-    >
-      <div className="card-body p-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <div className="p-3 rounded-circle" style={{ background: '#ef444420' }}>
-            <RiCloseCircleLine size={24} color="#ef4444" />
-          </div>
-          <span className="text-danger small fw-semibold">
-            <RiArrowDownLine className="me-1" />
-            Lost orders
-          </span>
-        </div>
-        <h2 className="fw-bold display-6 mb-1" style={{ color: '#ef4444' }}>
-          {orders.filter(o => o.status === "Canceled").length}
-        </h2>
-        <p className="text-muted mb-0">Canceled Orders</p>
-        <div className="mt-3">
-          <div className="progress" style={{ height: '4px' }}>
+          {/* Delivered Orders */}
+          <div className="col-xl-3 col-lg-4 col-md-6">
             <div 
-              className="progress-bar" 
-              style={{ 
-                width: `${orders.length > 0 ? (orders.filter(o => o.status === "Canceled").length / orders.length * 100) : 0}%`,
-                backgroundColor: '#ef4444'
+              className="card border-0 shadow-sm cursor-pointer hover-lift"
+              onClick={() => handleFilterOrders('Delivered')}
+              style={{
+                background: statusFilter === 'Delivered' ? 'linear-gradient(135deg, #10b98130 0%, #10b98110 100%)' : 'linear-gradient(135deg, #10b98115 0%, transparent 100%)',
+                borderLeft: `4px solid #10b981`,
+                transform: statusFilter === 'Delivered' ? 'translateY(-2px)' : 'none',
+                boxShadow: statusFilter === 'Delivered' ? '0 8px 16px rgba(16, 185, 129, 0.2)' : 'none',
+                transition: 'all 0.3s ease',
               }}
-            ></div>
+            >
+              <div className="card-body p-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className="p-3 rounded-circle" style={{ background: '#10b98120' }}>
+                    <RiCheckboxCircleLine size={24} color="#10b981" />
+                  </div>
+                  {statusFilter === 'Delivered' && (
+                    <span className="badge bg-success text-white">Active Filter</span>
+                  )}
+                </div>
+                <h2 className="fw-bold display-6 mb-1" style={{ color: '#10b981' }}>
+                  {orders.filter(o => o.status === "Delivered").length}
+                </h2>
+                <p className="text-muted mb-0">Delivered Orders</p>
+                <div className="mt-3">
+                  <div className="progress" style={{ height: '4px' }}>
+                    <div 
+                      className="progress-bar" 
+                      style={{ 
+                        width: `${orders.length > 0 ? (orders.filter(o => o.status === "Delivered").length / orders.length * 100) : 0}%`,
+                        backgroundColor: '#10b981'
+                      }}
+                    ></div>
+                  </div>
+                  <small className="text-muted mt-1 d-block">
+                    {orders.length > 0 ? Math.round((orders.filter(o => o.status === "Delivered").length / orders.length * 100)) : 0}% of total
+                  </small>
+                </div>
+              </div>
+            </div>
           </div>
-          <small className="text-muted mt-1 d-block">
-            {orders.length > 0 ? Math.round((orders.filter(o => o.status === "Canceled").length / orders.length * 100)) : 0}% of total
-          </small>
+
+          {/* Cancelled Orders */}
+          <div className="col-xl-3 col-lg-4 col-md-6">
+            <div 
+              className="card border-0 shadow-sm cursor-pointer hover-lift"
+              onClick={() => handleFilterOrders('Canceled')}
+              style={{
+                background: statusFilter === 'Canceled' ? 'linear-gradient(135deg, #ef444430 0%, #ef444410 100%)' : 'linear-gradient(135deg, #ef444415 0%, transparent 100%)',
+                borderLeft: `4px solid #ef4444`,
+                transform: statusFilter === 'Canceled' ? 'translateY(-2px)' : 'none',
+                boxShadow: statusFilter === 'Canceled' ? '0 8px 16px rgba(239, 68, 68, 0.2)' : 'none',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              <div className="card-body p-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className="p-3 rounded-circle" style={{ background: '#ef444420' }}>
+                    <RiCloseCircleLine size={24} color="#ef4444" />
+                  </div>
+                  {statusFilter === 'Canceled' && (
+                    <span className="badge bg-danger text-white">Active Filter</span>
+                  )}
+                </div>
+                <h2 className="fw-bold display-6 mb-1" style={{ color: '#ef4444' }}>
+                  {orders.filter(o => o.status === "Canceled").length}
+                </h2>
+                <p className="text-muted mb-0">Canceled Orders</p>
+                <div className="mt-3">
+                  <div className="progress" style={{ height: '4px' }}>
+                    <div 
+                      className="progress-bar" 
+                      style={{ 
+                        width: `${orders.length > 0 ? (orders.filter(o => o.status === "Canceled").length / orders.length * 100) : 0}%`,
+                        backgroundColor: '#ef4444'
+                      }}
+                    ></div>
+                  </div>
+                  <small className="text-muted mt-1 d-block">
+                    {orders.length > 0 ? Math.round((orders.filter(o => o.status === "Canceled").length / orders.length * 100)) : 0}% of total
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-</div>
 
+        {/* TOTAL ORDERS SUMMARY */}
+        <div className="row mb-4">
+          <div className="col-12">
+            <div
+              className="card border-0 shadow-sm hover-lift"
+              style={{
+                background: "linear-gradient(135deg, rgba(99,102,241,0.3) 0%, rgba(99,102,241,0.08) 100%)",
+                borderLeft: "5px solid #6366f1",
+              }}
+            >
+              <div className="card-body d-flex align-items-center justify-content-between p-4">
+                <div className="d-flex align-items-center">
+                  <div
+                    className="p-3 rounded-circle me-3"
+                    style={{ background: "#6366f120" }}
+                  >
+                    <RiShoppingBag3Line size={28} color="#6366f1" />
+                  </div>
+                  <div>
+                    <h5 className="mb-1 fw-semibold text-muted">Total Orders</h5>
+                    <h2 className="fw-bold mb-0">{orders.length}</h2>
+                  </div>
+                </div>
 
-
-{/* Add this CSS to your existing style tag */}
-<style jsx>{`
-  .cursor-pointer {
-    cursor: pointer;
-  }
-  .hover-lift:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1) !important;
-  }
-  .progress {
-    overflow: hidden;
-  }
-  .progress-bar {
-    border-radius: 2px;
-  }
-`}</style>
-{/* TOTAL ORDERS SUMMARY */}
-<div className="row mb-4">
-  <div className="col-12">
-    <div
-      className="card border-0 shadow-sm hover-lift"
-      style={{
-        background: "linear-gradient(135deg, rgba(99,102,241,0.3) 0%, rgba(99,102,241,0.08) 100%)",
-
-        borderLeft: "5px solid #6366f1",
-      }}
-    >
-      <div className="card-body d-flex align-items-center justify-content-between p-4">
-        <div className="d-flex align-items-center">
-          <div
-            className="p-3 rounded-circle me-3"
-            style={{ background: "#6366f120" }}
-          >
-            <RiShoppingBag3Line size={28} color="#6366f1" />
-          </div>
-          <div>
-            <h5 className="mb-1 fw-semibold text-muted">Total Orders</h5>
-            <h2 className="fw-bold mb-0">{orders.length}</h2>
+                <div className="d-flex align-items-center gap-3">
+                  <span className="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
+                    Showing: <span className="fw-bold">{filteredOrders.length}</span> of {orders.length}
+                  </span>
+                  {statusFilter !== "All" && (
+                    <span 
+                      className="badge px-3 py-2"
+                      style={{
+                        backgroundColor: getStatusBackgroundColor(statusFilter),
+                        color: getStatusTextColor(statusFilter),
+                        border: `1px solid ${getStatusTextColor(statusFilter)}`
+                      }}
+                    >
+                      Filter: {statusFilter}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
-        <span className="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
-          All statuses included
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
-
 
         <div className="card shadow-lg rounded-4">
-          <div className="card-header bg-dark text-white">
+          <div className="card-header bg-dark text-white d-flex justify-content-between align-items-center">
             <h5 className="mb-0">Orders List ({filteredOrders.length} orders)</h5>
+            {statusFilter !== "All" && (
+              <span 
+                className="badge"
+                style={{
+                  backgroundColor: getStatusBackgroundColor(statusFilter),
+                  color: getStatusTextColor(statusFilter),
+                  padding: "8px 12px"
+                }}
+              >
+                Showing: {statusFilter}
+              </span>
+            )}
           </div>
           <div className="table-responsive">
             <table className="table table-striped align-middle mb-0">
@@ -930,7 +978,7 @@ const downloadOrdersExcel = () => {
                   <th>Order ID</th>
                   <th>Customer</th>
                   <th>Phone</th>
-<th>UTR</th>
+                  <th>UTR</th>
                   <th>Date</th>
                   <th>Items</th>
                   <th>Total</th>
@@ -944,14 +992,12 @@ const downloadOrdersExcel = () => {
                   <tr key={order.docId}>
                     <td className="fw-bold text-primary">{order.id}</td>
                     <td>{order.customer}</td>
-                  
-<td className="fw-bold text-secondary">{order.phone}</td>
-<td>
-  <code className="bg-light px-2 py-1">
-    {order.utr}
-  </code>
-</td>
-
+                    <td className="fw-bold text-secondary">{order.phone}</td>
+                    <td>
+                      <code className="bg-light px-2 py-1">
+                        {order.utr}
+                      </code>
+                    </td>
                     <td>{order.date ? new Date(order.date).toLocaleDateString() : "N/A"}</td>
                     <td>
                       <span className="badge bg-secondary">{order.items} items</span>
@@ -966,74 +1012,77 @@ const downloadOrdersExcel = () => {
                       </span>
                     </td>
 
-                   <td className="text-center">
-  <div className="d-flex justify-content-center align-items-center gap-2 flex-wrap">
+                    <td className="text-center">
+                      <div className="d-flex justify-content-center align-items-center gap-2 flex-wrap">
 
-    {/* ACCEPT BUTTON (Pending only) */}
-    {order.status === "Pending" && (
-      <button
-        className="btn btn-success btn-sm d-flex align-items-center gap-1 shadow-sm"
-        onClick={() => handleAcceptOrderWithRestock(order)}
-        title="Accept Order"
-      >
-        <RiCheckLine />
-        <span className="d-none d-md-inline">Accept</span>
-      </button>
-    )}
+                        {/* ACCEPT BUTTON (Pending only) */}
+                        {order.status === "Pending" && (
+                          <button
+                            className="btn btn-success btn-sm d-flex align-items-center gap-1 shadow-sm"
+                            onClick={() => handleAcceptOrderWithRestock(order)}
+                            title="Accept Order"
+                          >
+                            <RiCheckLine />
+                            <span className="d-none d-md-inline">Accept</span>
+                          </button>
+                        )}
 
-    {/* STATUS DROPDOWN */}
-    <select
-      className="form-select form-select-sm shadow-sm"
-      style={{ width: "130px" }}
-      value={order.status}
-      onChange={(e) =>
-        handleStatusChange(
-          order.docId,
-          order.customerId,
-          e.target.value
-        )
-      }
-    >
-      <option value="Pending">Pending</option>
-      <option value="Shipped">Shipped</option>
-      <option value="Delivered">Delivered</option>
-      <option value="Canceled">Canceled</option>
-    </select>
+                        {/* STATUS DROPDOWN (NO ICONS) */}
+                        <select
+                          className="form-select form-select-sm shadow-sm"
+                          style={{ 
+                            width: "130px",
+                            borderLeft: `4px solid ${getStatusTextColor(order.status)}`,
+                            backgroundColor: getStatusBackgroundColor(order.status)
+                          }}
+                          value={order.status}
+                          onChange={(e) =>
+                            handleStatusChange(
+                              order.docId,
+                              order.customerId,
+                              e.target.value
+                            )
+                          }
+                        >
+                          <option value="Pending" style={{backgroundColor: "#fff3cd"}}>Pending</option>
+                          <option value="Shipped" style={{backgroundColor: "#cfe2ff"}}>Shipped</option>
+                          <option value="Delivered" style={{backgroundColor: "#d1e7dd"}}>Delivered</option>
+                          <option value="Canceled" style={{backgroundColor: "#f8d7da"}}>Canceled</option>
+                        </select>
 
-    {/* VIEW BUTTON */}
-    <button
-      className="btn btn-outline-primary btn-sm shadow-sm"
-      onClick={() =>
-        setViewOrder({
-          customerId: order.customerId,
-          docId: order.docId,
-        })
-      }
-      title="View Order"
-    >
-      <RiShoppingBag3Line />
-    </button>
+                        {/* VIEW BUTTON */}
+                        <button
+                          className="btn btn-outline-primary btn-sm shadow-sm"
+                          onClick={() =>
+                            setViewOrder({
+                              customerId: order.customerId,
+                              docId: order.docId,
+                            })
+                          }
+                          title="View Order"
+                        >
+                          <RiShoppingBag3Line />
+                        </button>
 
-    {/* DELETE BUTTON */}
-    <button
-      className="btn btn-outline-danger btn-sm shadow-sm"
-      onClick={() => setDeleteOrder(order)}
-      title="Delete Order"
-    >
-      <RiCloseCircleLine />
-    </button>
-  </div>
-</td>
-
+                        {/* DELETE BUTTON */}
+                        <button
+                          className="btn btn-outline-danger btn-sm shadow-sm"
+                          onClick={() => setDeleteOrder(order)}
+                          title="Delete Order"
+                        >
+                          <RiCloseCircleLine />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
 
                 {filteredOrders.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="text-center py-4 text-muted">
+                    <td colSpan="9" className="text-center py-4 text-muted">
                       <div className="py-5">
                         <span className="fs-1">📦</span>
-                        <p className="mt-2">No orders found</p>
+                        <p className="mt-2">No {statusFilter !== "All" ? statusFilter : ""} orders found</p>
                         {searchTerm && (
                           <small>Try adjusting your search term</small>
                         )}
@@ -1065,6 +1114,23 @@ const downloadOrdersExcel = () => {
           />
         )}
       </div>
+
+      {/* Add CSS styles */}
+      <style jsx>{`
+        .cursor-pointer {
+          cursor: pointer;
+        }
+        .hover-lift:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1) !important;
+        }
+        .progress {
+          overflow: hidden;
+        }
+        .progress-bar {
+          border-radius: 2px;
+        }
+      `}</style>
     </div>
   );
 };
