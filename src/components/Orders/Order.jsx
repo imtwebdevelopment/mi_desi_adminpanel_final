@@ -208,55 +208,139 @@ const OrderPage = ({ onNavigate }) => {
     });
   };
 
-  const downloadOrdersExcel = () => {
-    if (filteredOrders.length === 0) {
-      alert("No orders to export");
-      return;
-    }
+ const downloadOrdersExcel = async () => {
 
-    // Convert date strings to Date objects
-    const from = fromDate ? new Date(fromDate) : null;
-    const to = toDate ? new Date(toDate) : null;
+  const excelData = [];
 
-    // Filter by date range
-    const ordersToExport = filteredOrders.filter((o) => {
-      if (!o.date) return false;
+  const customersSnap = await getDocs(
+    collection(db, CUSTOMER_COLLECTION_NAME)
+  );
 
-      const orderDate = new Date(o.date);
-      
-      if (from && orderDate < from) return false;
-      if (to && orderDate > to) return false;
+  for (const customerDoc of customersSnap.docs) {
 
-      return true;
-    });
+    const customerId = customerDoc.id;
+    const customer = customerDoc.data();
 
-    if (ordersToExport.length === 0) {
-      alert("No orders found in the selected date range");
-      return;
-    }
+    /* ---------- ADDRESS FETCH ---------- */
 
-    const excelData = ordersToExport.map((o) => ({
-      "Order ID": o.id,
-      "Customer Name": o.customer,
-      "Customer ID": o.customerId,
-      "Referred By": o.referredBy,
-      "Phone": o.phone,
-      "UTR": o.utr,
-      "Items": o.items,
-      "Total Amount": o.total,
-      "Status": o.status,
-      "Order Date": o.date,
-    }));
+    let addressData = {};
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Orders Report");
-
-    XLSX.writeFile(
-      workbook,
-      `Orders_Report_${new Date().toISOString().slice(0, 10)}.xlsx`
+    const addressSnap = await getDocs(
+      collection(db, CUSTOMER_COLLECTION_NAME, customerId, "address")
     );
-  };
+
+    if (!addressSnap.empty) {
+      addressData = addressSnap.docs[0].data();
+    }
+
+    /* ---------- ORDERS FETCH ---------- */
+
+    const ordersSnap = await getDocs(
+      collection(
+        db,
+        CUSTOMER_COLLECTION_NAME,
+        customerId,
+        ORDER_SUBCOLLECTION_NAME
+      )
+    );
+
+    for (const orderDoc of ordersSnap.docs) {
+
+      const data = orderDoc.data();
+
+     const orderDateObj = data.createdAt?.toDate
+  ? data.createdAt.toDate()
+  : null;
+
+if (fromDate && orderDateObj && orderDateObj < new Date(fromDate)) continue;
+if (toDate && orderDateObj && orderDateObj > new Date(toDate)) continue;
+
+const orderDate = orderDateObj
+  ? orderDateObj.toLocaleDateString()
+  : "N/A";
+
+      const products = data.products || [];
+
+      products.forEach((item) => {
+        const status = data.status || data.orderStatus || "Pending";
+
+if (statusFilter !== "All" && status !== statusFilter) return;
+
+        const product = item.product || item || {};
+excelData.push({
+
+  "Referral Person ID":
+    customer.customerReferalCode ||
+    customer.referredBy ||
+    "Direct",
+
+  "Used Referral Code":
+    customer.usedReferralCode || "N/A",
+
+  "Customer Name":
+    customer.name || "N/A",
+
+  "Product Name":
+    product.title ||
+    product.name ||
+    "N/A",
+
+  "Purchased Amount":
+    data.totalAmount || 0,
+
+  "Status":
+    status,
+
+  "Address":
+    addressData.streetName || "",
+
+  "City":
+    addressData.city || "",
+
+  "State":
+    addressData.state || "",
+
+  "Mail":
+    addressData.email || "",
+
+  "Mobile Number":
+    addressData.phoneNumber ||
+    data.phoneNumber ||
+    "",
+
+  "Date":
+    orderDate
+});
+
+      });
+    }
+  }
+
+ if (excelData.length === 0) {
+  alert("No orders found");
+  return;
+}
+
+excelData.sort((a, b) => {
+  return new Date(a.Date).getTime() - new Date(b.Date).getTime();
+});
+
+
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+  const workbook = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    worksheet,
+    "Orders Report"
+  );
+
+  XLSX.writeFile(
+    workbook,
+    `Orders_Report_${new Date().toISOString().slice(0,10)}.xlsx`
+  );
+};
 
   /* -------------------------- EXTRACT PRODUCT DATA -------------------------- */
   const extractProductData = (item) => {

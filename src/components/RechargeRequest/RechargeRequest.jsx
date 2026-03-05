@@ -185,12 +185,11 @@ const RechargeRequestList = () => {
       "User Name": r.userName,
       "User ID": r.userId,
       "Referred By": r.referredBy,
-      "Partner Name": r.partnerName || "N/A",
       "UTR ID": r.displayUtr,
       "Mobile": r.number || "N/A",
       "Plan Price": r.plan?.price || "N/A",
       "Status": r.rechargeStatus || "Pending",
-      "Rejected Reason": r.rejectedReason || "",
+      "Rejected Reason": r.rejectedReason || "N/A",
       "Date": r.requestedDate?.toDate
         ? r.requestedDate.toDate().toLocaleString()
         : "N/A",
@@ -203,45 +202,47 @@ const RechargeRequestList = () => {
   };
 
   const confirmReject = async () => {
-    if (!rejectReason.trim()) {
-      alert("Please enter rejection reason");
-      return;
-    }
+  if (!rejectReason.trim()) {
+    alert("Please enter rejection reason");
+    return;
+  }
 
-    try {
-      setUpdatingId(rejectModal.requestId);
-      const requestRef = doc(
-        db,
-        `customers/${userId}/rechargeRequest`,
-        rejectModal.requestId
-      );
+  try {
+    setUpdatingId(rejectModal.requestId);
 
-      await updateDoc(requestRef, {
-        rechargeStatus: "Rejected",
-        rejectedReason: rejectReason,
-      });
+    const requestRef = doc(
+      db,
+      `customers/${rejectModal.userId}/rechargeRequest`,
+      rejectModal.requestId
+    );
 
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === rejectModal.requestId && r.userId === rejectModal.userId
-            ? {
-                ...r,
-                rechargeStatus: "Rejected",
-                rejectedReason: rejectReason,
-              }
-            : r
-        )
-      );
+    await updateDoc(requestRef, {
+      rechargeStatus: "Rejected",
+      rejectedReason: rejectReason,
+    });
 
-      setRejectModal(null);
-      setRejectReason("");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to reject request");
-    } finally {
-      setUpdatingId(null);
-    }
-  };
+    setRequests((prev) =>
+      prev.map((r) =>
+        r.id === rejectModal.requestId && r.userId === rejectModal.userId
+          ? {
+              ...r,
+              rechargeStatus: "Rejected",
+              rejectedReason: rejectReason,
+            }
+          : r
+      )
+    );
+
+    setRejectModal(null);
+    setRejectReason("");
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to reject request");
+  } finally {
+    setUpdatingId(null);
+  }
+};
 
   // Status color mapping
   const getStatusColor = (status) => {

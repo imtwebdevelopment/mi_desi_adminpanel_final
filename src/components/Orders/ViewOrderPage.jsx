@@ -62,35 +62,35 @@ const ViewOrderModal = ({ order, onClose }) => {
     });
   };
 
- const downloadInvoicePDF = () => {
-  const element = document.getElementById("print-area");
+  const downloadInvoicePDF = () => {
+    const element = document.getElementById("print-area");
 
-  if (!element) {
-    alert("Invoice content not found");
-    return;
-  }
-
-  const options = {
-    margin: [0.5, 0.4, 0.5, 0.4], // top, left, bottom, right
-    filename: `Invoice_${orderData?.orderId}.pdf`,
-    image: { type: "jpeg", quality: 0.98 },
-    html2canvas: {
-      scale: 2,
-      useCORS: true,
-      scrollY: 0
-    },
-    jsPDF: {
-      unit: "in",
-      format: "a4",
-      orientation: "portrait"
-    },
-    pagebreak: {
-      mode: ["css", "legacy"]
+    if (!element) {
+      alert("Invoice content not found");
+      return;
     }
-  };
 
-  html2pdf().set(options).from(element).save();
-};
+    const options = {
+      margin: [0.5, 0.4, 0.5, 0.4], // top, left, bottom, right
+      filename: `Invoice_${orderData?.orderId}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        scrollY: 0
+      },
+      jsPDF: {
+        unit: "in",
+        format: "a4",
+        orientation: "portrait"
+      },
+      pagebreak: {
+        mode: ["css", "legacy"]
+      }
+    };
+
+    html2pdf().set(options).from(element).save();
+  };
 
 
 
@@ -133,17 +133,17 @@ const ViewOrderModal = ({ order, onClose }) => {
 
 
   return (
-    <div className="modal show d-block" style={{ 
+    <div className="modal show d-block" style={{
       background: "linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.8) 100%)",
       backdropFilter: "blur(5px)"
     }}>
-      
+
       <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div className="modal-content rounded-4 shadow-lg border-0 overflow-hidden">
-          
+
           {/* ENHANCED HEADER */}
-          <div className="modal-header bg-gradient-primary text-white py-4 border-0" 
-               style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
+          <div className="modal-header bg-gradient-primary text-white py-4 border-0"
+            style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
             <div className="d-flex align-items-center w-100">
               <div className="rounded-circle bg-white bg-opacity-25 p-3 me-3">
                 <i className="bi bi-receipt fs-4"></i>
@@ -177,9 +177,9 @@ const ViewOrderModal = ({ order, onClose }) => {
                   {/* ORDER INFO CARD */}
                   <div className="col-lg-6">
                     <div
-  className="card border-0 shadow-sm h-100"
-  style={{ pageBreakInside: "avoid" }}
->
+                      className="card border-0 shadow-sm h-100"
+                      style={{ pageBreakInside: "avoid" }}
+                    >
 
                       <div className="card-header bg-transparent border-0 pb-0">
                         <h5 className="fw-bold text-primary mb-0">
@@ -191,9 +191,9 @@ const ViewOrderModal = ({ order, onClose }) => {
                         <div className="row">
                           <div className="col-6">
                             <p className="text-muted small mb-1">Order ID</p>
-                           <p className="fw-bold" style={{ wordBreak: "break-all" }}>
-  {orderData.orderId}
-</p>
+                            <p className="fw-bold" style={{ wordBreak: "break-all" }}>
+                              {orderData.orderId}
+                            </p>
 
                           </div>
                           <div className="col-6">
@@ -203,7 +203,7 @@ const ViewOrderModal = ({ order, onClose }) => {
                             </span>
                           </div>
                         </div>
-                        
+
                         <div className="row mt-3">
                           <div className="col-6">
                             <p className="text-muted small mb-1">Order Date</p>
@@ -218,19 +218,19 @@ const ViewOrderModal = ({ order, onClose }) => {
                         <div className="row mt-3">
                           <div className="col-6">
                             <p className="text-muted small mb-1">Payment Mode</p>
-                           <p className="fw-medium">
-  {orderData.products?.[0]?.product?.cashOnDelivery === "Yes" ? (
-    <span className="badge bg-warning text-dark px-3 py-2 rounded-pill">
-      <i className="bi bi-cash-coin me-1"></i>
-      Cash on Delivery
-    </span>
-  ) : (
-    <span className="badge bg-success px-3 py-2 rounded-pill">
-      <i className="bi bi-credit-card me-1"></i>
-      Prepaid
-    </span>
-  )}
-</p>
+                            <p className="fw-medium">
+                              {orderData.products?.[0]?.product?.cashOnDelivery === "Yes" ? (
+                                <span className="badge bg-warning text-dark px-3 py-2 rounded-pill">
+                                  <i className="bi bi-cash-coin me-1"></i>
+                                  Cash on Delivery
+                                </span>
+                              ) : (
+                                <span className="badge bg-success px-3 py-2 rounded-pill">
+                                  <i className="bi bi-credit-card me-1"></i>
+                                  Prepaid
+                                </span>
+                              )}
+                            </p>
 
                           </div>
                           <div className="col-6">
@@ -246,7 +246,7 @@ const ViewOrderModal = ({ order, onClose }) => {
                               <code className="bg-light px-3 py-2 rounded flex-grow-1">
                                 {orderData.transactionId}
                               </code>
-                              <button 
+                              <button
                                 className="btn btn-outline-primary btn-sm"
                                 onClick={() => copyToClipboard(orderData.transactionId)}
                                 title="Copy Transaction ID"
@@ -262,11 +262,11 @@ const ViewOrderModal = ({ order, onClose }) => {
 
                   {/* CUSTOMER INFO CARD */}
                   <div className="col-lg-6">
-                   <div
-  className="card border-0 shadow-sm h-100"
-  style={{ pageBreakInside: "avoid" }}
->
-                        
+                    <div
+                      className="card border-0 shadow-sm h-100"
+                      style={{ pageBreakInside: "avoid" }}
+                    >
+
                       <div className="card-header bg-transparent border-0 pb-0">
                         <h5 className="fw-bold text-primary mb-0">
                           <i className="bi bi-person-circle me-2"></i>
@@ -282,8 +282,8 @@ const ViewOrderModal = ({ order, onClose }) => {
                           <div className="col-6">
                             <p className="text-muted small mb-1">User ID</p>
                             <p className="fw-medium" style={{ wordBreak: "break-all" }}>
-  {orderData.userId}
-</p>
+                              {orderData.userId}
+                            </p>
 
                           </div>
                         </div>
@@ -291,7 +291,7 @@ const ViewOrderModal = ({ order, onClose }) => {
                         <div className="mt-3">
                           <div className="d-flex justify-content-between align-items-start mb-1">
                             <p className="text-muted small mb-0">Delivery Address</p>
-                            <button 
+                            <button
                               className="btn btn-outline-primary btn-sm"
                               onClick={() => copyToClipboard(orderData.address)}
                               title="Copy Address"
@@ -312,7 +312,7 @@ const ViewOrderModal = ({ order, onClose }) => {
                               <code className="bg-light px-3 py-2 rounded flex-grow-1">
                                 {orderData.latitude.toFixed(6)}, {orderData.longitude.toFixed(6)}
                               </code>
-                              <button 
+                              <button
                                 className="btn btn-outline-primary btn-sm"
                                 onClick={() => copyToClipboard(`${orderData.latitude}, ${orderData.longitude}`)}
                                 title="Copy Coordinates"
@@ -349,9 +349,9 @@ const ViewOrderModal = ({ order, onClose }) => {
                         return (
                           <div key={index} className="col-12">
                             <div
-  className="card border shadow-sm hover-shadow transition-all duration-300"
-  style={{ pageBreakInside: "avoid" }}
->
+                              className="card border shadow-sm hover-shadow transition-all duration-300"
+                              style={{ pageBreakInside: "avoid" }}
+                            >
 
                               <div className="card-body">
                                 <div className="row align-items-center">
@@ -444,13 +444,13 @@ const ViewOrderModal = ({ order, onClose }) => {
                 </div>
 
                 {/* PRICE SUMMARY CARD */}
-              <div
-  className="card border-0 shadow-sm"
-  style={{
-    background: "linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)",
-    pageBreakInside: "avoid"
-  }}
->
+                <div
+                  className="card border-0 shadow-sm"
+                  style={{
+                    background: "linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)",
+                    pageBreakInside: "avoid"
+                  }}
+                >
 
                   <div className="card-header bg-transparent border-0">
                     <h5 className="fw-bold text-primary mb-0">
@@ -466,7 +466,7 @@ const ViewOrderModal = ({ order, onClose }) => {
                             <span className="text-muted">Subtotal</span>
                             <span className="fw-bold">₹{subtotal.toFixed(2)}</span>
                           </div>
-                          
+
                           <div className="d-flex justify-content-between align-items-center mb-3">
                             <span className="text-muted">
                               <i className="bi bi-percent me-1"></i>
@@ -474,7 +474,7 @@ const ViewOrderModal = ({ order, onClose }) => {
                             </span>
                             <span className="fw-bold text-warning">₹{taxAmount.toFixed(2)}</span>
                           </div>
-                          
+
                           <div className="d-flex justify-content-between align-items-center mb-4">
                             <span className="text-muted">
                               <i className="bi bi-truck me-1"></i>
@@ -482,9 +482,9 @@ const ViewOrderModal = ({ order, onClose }) => {
                             </span>
                             <span className="fw-bold text-info">₹{deliveryCharges.toFixed(2)}</span>
                           </div>
-                          
+
                           <hr className="my-3" />
-                          
+
                           <div className="d-flex justify-content-between align-items-center pt-2">
                             <div>
                               <h5 className="fw-bold mb-0">Total Amount</h5>
@@ -510,23 +510,23 @@ const ViewOrderModal = ({ order, onClose }) => {
           {/* ENHANCED FOOTER */}
           <div className="modal-footer border-0 bg-light py-3">
             <div className="d-flex gap-3 w-100">
-              <button 
+              <button
                 className="btn btn-outline-secondary rounded-pill px-4 py-2 flex-grow-1"
                 onClick={onClose}
               >
                 <i className="bi bi-x-circle me-2"></i>
                 Close
               </button>
-          <button 
-  className="btn btn-primary rounded-pill px-4 py-2 flex-grow-1"
-  onClick={downloadInvoicePDF}
->
-  <i className="bi bi-file-earmark-pdf me-2"></i>
-  Download Invoice PDF
-</button>
+              <button
+                className="btn btn-primary rounded-pill px-4 py-2 flex-grow-1"
+                onClick={downloadInvoicePDF}
+              >
+                <i className="bi bi-file-earmark-pdf me-2"></i>
+                Download Invoice PDF
+              </button>
 
 
-              
+
             </div>
           </div>
 
