@@ -274,8 +274,15 @@ excelData.push({
     customer.referredBy ||
     "Direct",
 
-  "Used Referral Code":
-    customer.usedReferralCode || "N/A",
+  "Referral Person Name":
+    customer.referredByName ||
+    customer.partnerName ||
+    "N/A",
+
+  "Referral Person E-MAIL ID":
+    customer.partnerEmail ||
+    customer.email ||
+    "N/A",
 
   "Customer Name":
     customer.name || "N/A",
@@ -307,6 +314,11 @@ excelData.push({
     addressData.phoneNumber ||
     data.phoneNumber ||
     "",
+
+  "Customer Referral id":
+    customer.customerReferalCode ||
+    customer.referredBy ||
+    "Direct",
 
   "Date":
     orderDate

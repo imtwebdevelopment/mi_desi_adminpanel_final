@@ -25,22 +25,29 @@ const ReferralList = () => {
   };
 
   // ✅ Fetch customer's name
-  const fetchCustomerName = async (customerId) => {
-    if (!customerId) return "N/A";
-    try {
-      const customerRef = doc(db, "customers", customerId);
-      const customerSnap = await getDoc(customerRef);
-      if (customerSnap.exists()) {
-        const data = customerSnap.data();
-        return data.name || data.fullName || "Unnamed";
-      } else {
-        return "Unknown User";
-      }
-    } catch (error) {
-      console.error("Error fetching customer:", error);
-      return "Error";
+ const fetchCustomerDetails = async (customerId) => {
+  if (!customerId) return "N/A";
+
+  try {
+    const customerRef = doc(db, "customers", customerId);
+    const customerSnap = await getDoc(customerRef);
+
+    if (customerSnap.exists()) {
+      const data = customerSnap.data();
+
+      const name = data.name || data.fullName || "Unnamed";
+      const email = data.email || "No Email";
+      const referralCode = data.customerReferalCode || "No Code";
+
+      return `${name} (${email}) - ${referralCode}`;
+    } else {
+      return "Unknown User";
     }
-  };
+  } catch (error) {
+    console.error("Error fetching customer:", error);
+    return "Error";
+  }
+};
 
   // ✅ Fetch referrals with resolved names
   useEffect(() => {
@@ -56,8 +63,8 @@ const ReferralList = () => {
           const withNames = await Promise.all(
             rawData.map(async (ref) => ({
               ...ref,
-              referredByName: await fetchCustomerName(ref.referredBy),
-              referredToName: await fetchCustomerName(ref.referredTo),
+              referredByName: await fetchCustomerDetails(ref.referredBy),
+referredToName: await fetchCustomerDetails(ref.referredTo),
             }))
           );
 

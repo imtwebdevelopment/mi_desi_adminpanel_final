@@ -102,6 +102,20 @@ const RechargeRequestList = () => {
     fetchRechargeRequests();
   }, [fetchRechargeRequests]);
 
+  const pendingCount = requests.filter(
+  (r) => (r.rechargeStatus || "Pending") === "Pending"
+).length;
+
+const successCount = requests.filter(
+  (r) => r.rechargeStatus === "Success"
+).length;
+
+const rejectedCount = requests.filter(
+  (r) => r.rechargeStatus === "Rejected"
+).length;
+
+const totalRequests = requests.length;
+
   /* =========================
     FILTER LOGIC
   ========================= */
@@ -181,25 +195,45 @@ const RechargeRequestList = () => {
     EXCEL EXPORT
   ========================= */
   const handleDownloadExcel = () => {
-    const excelData = filteredRequests.map((r) => ({
-      "User Name": r.userName,
-      "User ID": r.userId,
-      "Referred By": r.referredBy,
-      "UTR ID": r.displayUtr,
-      "Mobile": r.number || "N/A",
-      "Plan Price": r.plan?.price || "N/A",
-      "Status": r.rechargeStatus || "Pending",
-      "Rejected Reason": r.rejectedReason || "N/A",
-      "Date": r.requestedDate?.toDate
-        ? r.requestedDate.toDate().toLocaleString()
-        : "N/A",
-    }));
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Recharge Report");
-    XLSX.writeFile(workbook, "Recharge_Requests.xlsx");
-  };
+  const excelData = filteredRequests.map((r) => ({
+
+    "Referral Person ID": r.referredBy || "Direct",
+
+    "Referral Person Name": r.userName || "N/A",
+
+    "Referral Person E-MAIL ID": r.email || "N/A",
+
+    "UTR ID": r.displayUtr || "N/A",
+
+    "Plan Price": r.plan?.price || "N/A",
+
+    "Mobile": r.number || "N/A",
+
+    "company Name": r.plan?.rechargeProvider || "N/A",
+
+    "Rejected Reason": r.rejectedReason || "N/A",
+
+    "Customer name": r.userName || "N/A",
+
+    "Mail id": r.email || "N/A",
+
+    "Status": r.rechargeStatus || "Pending",
+
+    "Customer Refrall id": r.userId || "N/A",
+
+    "Date and time": r.requestedDate?.toDate
+      ? r.requestedDate.toDate().toLocaleString()
+      : "N/A"
+
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Recharge Report");
+
+  XLSX.writeFile(workbook, "Recharge_Requests.xlsx");
+};
 
   const confirmReject = async () => {
   if (!rejectReason.trim()) {
@@ -282,8 +316,69 @@ const RechargeRequestList = () => {
   };
 
   return (
-    <div style={{ backgroundColor: "#f4f7f6", minHeight: "100vh" }}>
-      <div className="mt-1">
+    <div
+  style={{
+    backgroundColor: "#f4f7f6",
+    minHeight: "100vh",
+    paddingLeft: "20px",
+    paddingRight: "20px"
+  }}
+>
+      <div className="mt-1" style={{ marginLeft: "10px" }}>
+        <div
+  className="row g-4 mb-4 w-100"
+  style={{ marginTop: "40px" }}
+>
+
+  {/* Pending */}
+  <div className="col-12 col-sm-6 col-lg-3">
+    <div className="card shadow-sm border-0"
+      style={{background:"#fff3cd",borderLeft:"5px solid #ffc107"}}>
+      <div className="card-body">
+        <h2 className="fw-bold text-warning">{pendingCount}</h2>
+        <p className="mb-1">Pending Requests</p>
+        <small>{totalRequests ? Math.round((pendingCount/totalRequests)*100) : 0}% of total</small>
+      </div>
+    </div>
+  </div>
+
+  {/* Success */}
+  <div className="col-md-3">
+    <div className="card shadow-sm border-0"
+      style={{background:"#d1e7dd",borderLeft:"5px solid #198754"}}>
+      <div className="card-body">
+        <h2 className="fw-bold text-success">{successCount}</h2>
+        <p className="mb-1">Success Requests</p>
+        <small>{totalRequests ? Math.round((successCount/totalRequests)*100) : 0}% of total</small>
+      </div>
+    </div>
+  </div>
+
+  {/* Rejected */}
+  <div className="col-md-3">
+    <div className="card shadow-sm border-0"
+      style={{background:"#f8d7da",borderLeft:"5px solid #dc3545"}}>
+      <div className="card-body">
+        <h2 className="fw-bold text-danger">{rejectedCount}</h2>
+        <p className="mb-1">Rejected Requests</p>
+        <small>{totalRequests ? Math.round((rejectedCount/totalRequests)*100) : 0}% of total</small>
+      </div>
+    </div>
+  </div>
+
+  {/* Total */}
+  <div className="col-md-3">
+    <div className="card shadow-sm border-0"
+      style={{background:"#e2e3e5",borderLeft:"5px solid #6c757d"}}>
+      <div className="card-body">
+        <h2 className="fw-bold text-secondary">{totalRequests}</h2>
+        <p className="mb-1">Total Requests</p>
+        <small>All recharge requests</small>
+      </div>
+    </div>
+  </div>
+
+</div>
         <FixedHeader onSearchChange={handleSearchChange} />
 
         <div className="bg-white border rounded-3 shadow-sm p-3 mb-4">
