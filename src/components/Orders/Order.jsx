@@ -106,7 +106,7 @@ const ConfirmDeleteModal = ({ order, onClose, onConfirm }) => {
 };
 
 /* =============================================================
-   ORDER PAGE
+  ORDER PAGE
 ============================================================= */
 const OrderPage = ({ onNavigate }) => {
   const [orders, setOrders] = useState([]);
@@ -116,7 +116,7 @@ const OrderPage = ({ onNavigate }) => {
 
   const [viewOrder, setViewOrder] = useState(null);
   const [deleteOrder, setDeleteOrder] = useState(null);
-  
+
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -171,7 +171,9 @@ const OrderPage = ({ onNavigate }) => {
               data.transactionData?.transactionId ||
               "N/A",
 
-            date: data.createdAt?.toDate().toISOString() || data.date || null,
+            date: data.createdAt?.toDate
+              ? data.createdAt.toDate().toISOString()
+              : data.date || null,
 
             total: (data.totalAmount || data.total || 0).toFixed(2),
             items: data.products?.length || 0,
@@ -208,162 +210,172 @@ const OrderPage = ({ onNavigate }) => {
     });
   };
 
- const downloadOrdersExcel = async () => {
+  const downloadOrdersExcel = async () => {
 
-  const excelData = [];
+    const excelData = [];
 
-  const customersSnap = await getDocs(
-    collection(db, CUSTOMER_COLLECTION_NAME)
-  );
-
-  for (const customerDoc of customersSnap.docs) {
-
-    const customerId = customerDoc.id;
-    const customer = customerDoc.data();
-
-    /* ---------- ADDRESS FETCH ---------- */
-
-    let addressData = {};
-
-    const addressSnap = await getDocs(
-      collection(db, CUSTOMER_COLLECTION_NAME, customerId, "address")
+    const customersSnap = await getDocs(
+      collection(db, CUSTOMER_COLLECTION_NAME)
     );
 
-    if (!addressSnap.empty) {
-      addressData = addressSnap.docs[0].data();
+    for (const customerDoc of customersSnap.docs) {
+
+      const customerId = customerDoc.id;
+      const customer = customerDoc.data();
+
+      /* ---------- ADDRESS FETCH ---------- */
+
+      let addressData = {};
+
+      const addressSnap = await getDocs(
+        collection(db, CUSTOMER_COLLECTION_NAME, customerId, "address")
+      );
+
+      if (!addressSnap.empty) {
+        addressData = addressSnap.docs[0].data();
+      }
+
+      /* ---------- ORDERS FETCH ---------- */
+
+      const ordersSnap = await getDocs(
+        collection(
+          db,
+          CUSTOMER_COLLECTION_NAME,
+          customerId,
+          ORDER_SUBCOLLECTION_NAME
+        )
+      );
+
+      for (const orderDoc of ordersSnap.docs) {
+
+        const data = orderDoc.data();
+
+        const orderDateObj = data.createdAt?.toDate
+          ? data.createdAt.toDate()
+          : null;
+
+        if (fromDate && orderDateObj && orderDateObj < new Date(fromDate)) continue;
+        if (toDate && orderDateObj && orderDateObj > new Date(toDate)) continue;
+
+        const orderDate = orderDateObj
+          ? orderDateObj.toISOString().split("T")[0]
+          : "N/A";
+
+        const products = data.products || [];
+
+        products.forEach((item) => {
+          const status = data.status || data.orderStatus || "Pending";
+
+          if (statusFilter !== "All" && status !== statusFilter) return;
+
+          const product = item.product ? item.product : item;
+          excelData.push({
+
+            "Order ID": data.orderId || orderDoc.id,
+
+            "Referral Person ID":
+              customer.customerReferalCode ||
+              customer.referralCode ||
+              customer.referredBy ||
+              customer.partnerReferalCode ||
+              "Direct",
+
+            "Referral Person Name":
+              customer.referredByName ||
+              customer.partnerName ||
+              "N/A",
+
+            "Referral Person E-MAIL ID":
+              customer.partnerEmail ||
+              customer.email ||
+              "N/A",
+
+            "Customer Name":
+              customer.name || "N/A",
+
+            "Product Name":
+              product.title ||
+              product.name ||
+              product.productName ||
+              "N/A",
+
+            "Quantity":
+              Number(item.quantity) || 1,
+
+            "Purchased Amount":
+              (Number(product.price) || 0) * (Number(item.quantity) || 1),
+
+            "Status":
+              status,
+
+            "Address":
+              addressData.streetName || "",
+
+            "City":
+              addressData.city || "",
+
+            "State":
+              addressData.state || "",
+
+            "Mail":
+              addressData.email || "",
+
+            "Mobile Number":
+              addressData.phoneNumber ||
+              data.phoneNumber ||
+              "",
+
+            "Customer Referral id":
+              customer.referralCode ||
+              customer.customerReferalCode ||
+              customer.referredBy ||
+              "Direct",
+
+            "Date":
+              orderDate
+          });
+
+        });
+      }
     }
 
-    /* ---------- ORDERS FETCH ---------- */
+    if (excelData.length === 0) {
+      alert("No orders found");
+      return;
+    }
 
-    const ordersSnap = await getDocs(
-      collection(
-        db,
-        CUSTOMER_COLLECTION_NAME,
-        customerId,
-        ORDER_SUBCOLLECTION_NAME
-      )
+    excelData.sort((a, b) => {
+      if (a.Date === "N/A" || b.Date === "N/A") return 0;
+      return new Date(a.Date) - new Date(b.Date);
+    });
+
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Orders Report"
     );
 
-    for (const orderDoc of ordersSnap.docs) {
-
-      const data = orderDoc.data();
-
-     const orderDateObj = data.createdAt?.toDate
-  ? data.createdAt.toDate()
-  : null;
-
-if (fromDate && orderDateObj && orderDateObj < new Date(fromDate)) continue;
-if (toDate && orderDateObj && orderDateObj > new Date(toDate)) continue;
-
-const orderDate = orderDateObj
-  ? orderDateObj.toLocaleDateString()
-  : "N/A";
-
-      const products = data.products || [];
-
-      products.forEach((item) => {
-        const status = data.status || data.orderStatus || "Pending";
-
-if (statusFilter !== "All" && status !== statusFilter) return;
-
-        const product = item.product || item || {};
-excelData.push({
-
-  "Referral Person ID":
-    customer.customerReferalCode ||
-    customer.referredBy ||
-    "Direct",
-
-  "Referral Person Name":
-    customer.referredByName ||
-    customer.partnerName ||
-    "N/A",
-
-  "Referral Person E-MAIL ID":
-    customer.partnerEmail ||
-    customer.email ||
-    "N/A",
-
-  "Customer Name":
-    customer.name || "N/A",
-
-  "Product Name":
-    product.title ||
-    product.name ||
-    "N/A",
-
-  "Purchased Amount":
-    data.totalAmount || 0,
-
-  "Status":
-    status,
-
-  "Address":
-    addressData.streetName || "",
-
-  "City":
-    addressData.city || "",
-
-  "State":
-    addressData.state || "",
-
-  "Mail":
-    addressData.email || "",
-
-  "Mobile Number":
-    addressData.phoneNumber ||
-    data.phoneNumber ||
-    "",
-
-  "Customer Referral id":
-    customer.customerReferalCode ||
-    customer.referredBy ||
-    "Direct",
-
-  "Date":
-    orderDate
-});
-
-      });
-    }
-  }
-
- if (excelData.length === 0) {
-  alert("No orders found");
-  return;
-}
-
-excelData.sort((a, b) => {
-  return new Date(a.Date).getTime() - new Date(b.Date).getTime();
-});
-
-
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
-
-  const workbook = XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    worksheet,
-    "Orders Report"
-  );
-
-  XLSX.writeFile(
-    workbook,
-    `Orders_Report_${new Date().toISOString().slice(0,10)}.xlsx`
-  );
-};
+    XLSX.writeFile(
+      workbook,
+      `Orders_Report_${new Date().toISOString().slice(0, 10)}.xlsx`
+    );
+  };
 
   /* -------------------------- EXTRACT PRODUCT DATA -------------------------- */
   const extractProductData = (item) => {
     // Handle nested product structure: {product: {…}, quantity: 6}
     if (item.product && typeof item.product === 'object') {
       const product = item.product;
-      
+
       const productId = product.id || product.productId || product.docId;
       const productName = product.name || product.productName || product.title || "Unknown Product";
       const quantity = item.quantity || item.qty || 1;
-      
+
       return {
         productId: productId,
         quantity: quantity,
@@ -386,7 +398,7 @@ excelData.sort((a, b) => {
         productName: item.productName || item.name || "Unknown Product"
       };
     }
-    
+
     console.warn("❌ Unknown product structure:", item);
     return null;
   };
@@ -439,14 +451,14 @@ excelData.sort((a, b) => {
       // Check if products array exists and has items
       if (order.products && order.products.length > 0) {
         console.log("📦 Processing stock deduction for", order.products.length, "products");
-        
+
         // First, validate all products and extract product data
         const productItems = [];
-        
+
         for (const item of order.products) {
           console.log("🛒 Processing order item:", item);
           const productData = extractProductData(item);
-          
+
           if (!productData) {
             console.error("❌ Could not extract product data from:", item);
             alert(`Invalid product data in order. Please check product structure.`);
@@ -502,14 +514,14 @@ excelData.sort((a, b) => {
 
         // If there are out-of-stock items, show warning but continue
         if (outOfStockItems.length > 0) {
-          const outOfStockMessage = outOfStockItems.map(item => 
+          const outOfStockMessage = outOfStockItems.map(item =>
             `• ${item.name}: Required ${item.required}, Available ${item.available}`
           ).join('\n');
-          
+
           const userChoice = window.confirm(
             `⚠️ Some items have insufficient stock:\n\n${outOfStockMessage}\n\nDo you want to proceed with accepting the order anyway? Stock will not be deducted for out-of-stock items.`
           );
-          
+
           if (!userChoice) {
             alert("Order acceptance cancelled.");
             return;
@@ -526,11 +538,11 @@ excelData.sort((a, b) => {
           const quantity = productItem.quantity;
 
           console.log(`➖ Deducting stock: ${productItem.productId} - ${stock} -> ${stock - quantity}`);
-          
+
           await updateDoc(productRef, {
             stockCount: stock - quantity,
           });
-          
+
           console.log(`✅ Stock deducted: ${productItem.productName} - ${quantity} units`);
         }
 
@@ -582,7 +594,7 @@ excelData.sort((a, b) => {
         message: error.message,
         stack: error.stack
       });
-      
+
       // More specific error messages
       if (error.code === 'permission-denied') {
         alert("❌ Permission denied. Check your Firebase rules.");
@@ -612,7 +624,7 @@ excelData.sort((a, b) => {
       // Check stock first
       if (order.products && order.products.length > 0) {
         const productItems = [];
-        
+
         for (const item of order.products) {
           const productData = extractProductData(item);
           if (productData && productData.productId) {
@@ -642,14 +654,14 @@ excelData.sort((a, b) => {
 
         // If out-of-stock items found, offer to restock
         if (outOfStockItems.length > 0) {
-          const outOfStockMessage = outOfStockItems.map(item => 
+          const outOfStockMessage = outOfStockItems.map(item =>
             `• ${item.productName}: Required ${item.quantity}, Available ${item.available}`
           ).join('\n');
-          
+
           const userChoice = window.confirm(
             `⚠️ Insufficient stock for ${outOfStockItems.length} item(s):\n\n${outOfStockMessage}\n\nDo you want to automatically restock these items and then accept the order?`
           );
-          
+
           if (userChoice) {
             // Restock all out-of-stock items
             for (const item of outOfStockItems) {
@@ -657,7 +669,7 @@ excelData.sort((a, b) => {
               const restockAmount = Math.max(neededStock + 5, 10); // Restock needed amount + buffer
               await handleRestockProduct(item.productId, item.productName, restockAmount);
             }
-            
+
             // Clear out-of-stock items after restocking
             outOfStockItems = [];
           } else {
@@ -669,7 +681,7 @@ excelData.sort((a, b) => {
 
       // Now proceed with normal order acceptance
       await handleAcceptOrder(order);
-      
+
     } catch (error) {
       console.error("Order acceptance with restock error:", error);
       alert(`❌ Failed to accept order: ${error.message}`);
@@ -680,7 +692,7 @@ excelData.sort((a, b) => {
   const handleStatusChange = async (docId, customerId, newStatus) => {
     try {
       console.log(`🔄 Changing status for order ${docId} to ${newStatus}`);
-      
+
       const orderRef = doc(
         db,
         CUSTOMER_COLLECTION_NAME,
@@ -720,8 +732,8 @@ excelData.sort((a, b) => {
 
     try {
       console.log("🗑️ Deleting order:", deleteOrder.id);
-      
-      await deleteDoc(  
+
+      await deleteDoc(
         doc(
           db,
           CUSTOMER_COLLECTION_NAME,
@@ -773,7 +785,7 @@ excelData.sort((a, b) => {
   }
 
   /* =============================================================
-     RENDER UI
+    RENDER UI
   ============================================================= */
   return (
     <div style={{ minHeight: "100vh", background: "#f1f3f6" }}>
@@ -797,10 +809,10 @@ excelData.sort((a, b) => {
               }}
             >
               <option value="All" className="text-dark">All Status</option>
-              <option value="Pending" className="text-warning fw-bold" style={{backgroundColor: "#fff3cd"}}>Pending</option>
-              <option value="Shipped" className="text-info fw-bold" style={{backgroundColor: "#cfe2ff"}}>Shipped</option>
-              <option value="Delivered" className="text-success fw-bold" style={{backgroundColor: "#d1e7dd"}}>Delivered</option>
-              <option value="Canceled" className="text-danger fw-bold" style={{backgroundColor: "#f8d7da"}}>Canceled</option>
+              <option value="Pending" className="text-warning fw-bold" style={{ backgroundColor: "#fff3cd" }}>Pending</option>
+              <option value="Shipped" className="text-info fw-bold" style={{ backgroundColor: "#cfe2ff" }}>Shipped</option>
+              <option value="Delivered" className="text-success fw-bold" style={{ backgroundColor: "#d1e7dd" }}>Delivered</option>
+              <option value="Canceled" className="text-danger fw-bold" style={{ backgroundColor: "#f8d7da" }}>Canceled</option>
             </select>
 
             <input
@@ -830,7 +842,7 @@ excelData.sort((a, b) => {
         <div className="row g-4 mb-4">
           {/* Pending Orders */}
           <div className="col-xl-3 col-lg-4 col-md-6">
-            <div 
+            <div
               className="card border-0 shadow-sm cursor-pointer hover-lift"
               onClick={() => handleFilterOrders('Pending')}
               style={{
@@ -856,9 +868,9 @@ excelData.sort((a, b) => {
                 <p className="text-muted mb-0">Pending Orders</p>
                 <div className="mt-3">
                   <div className="progress" style={{ height: '4px' }}>
-                    <div 
-                      className="progress-bar" 
-                      style={{ 
+                    <div
+                      className="progress-bar"
+                      style={{
                         width: `${orders.length > 0 ? (orders.filter(o => o.status === "Pending").length / orders.length * 100) : 0}%`,
                         backgroundColor: '#f59e0b'
                       }}
@@ -874,7 +886,7 @@ excelData.sort((a, b) => {
 
           {/* Shipped Orders */}
           <div className="col-xl-3 col-lg-4 col-md-6">
-            <div 
+            <div
               className="card border-0 shadow-sm cursor-pointer hover-lift"
               onClick={() => handleFilterOrders('Shipped')}
               style={{
@@ -900,9 +912,9 @@ excelData.sort((a, b) => {
                 <p className="text-muted mb-0">Shipped Orders</p>
                 <div className="mt-3">
                   <div className="progress" style={{ height: '4px' }}>
-                    <div 
-                      className="progress-bar" 
-                      style={{ 
+                    <div
+                      className="progress-bar"
+                      style={{
                         width: `${orders.length > 0 ? (orders.filter(o => o.status === "Shipped").length / orders.length * 100) : 0}%`,
                         backgroundColor: '#0ea5e9'
                       }}
@@ -918,7 +930,7 @@ excelData.sort((a, b) => {
 
           {/* Delivered Orders */}
           <div className="col-xl-3 col-lg-4 col-md-6">
-            <div 
+            <div
               className="card border-0 shadow-sm cursor-pointer hover-lift"
               onClick={() => handleFilterOrders('Delivered')}
               style={{
@@ -944,9 +956,9 @@ excelData.sort((a, b) => {
                 <p className="text-muted mb-0">Delivered Orders</p>
                 <div className="mt-3">
                   <div className="progress" style={{ height: '4px' }}>
-                    <div 
-                      className="progress-bar" 
-                      style={{ 
+                    <div
+                      className="progress-bar"
+                      style={{
                         width: `${orders.length > 0 ? (orders.filter(o => o.status === "Delivered").length / orders.length * 100) : 0}%`,
                         backgroundColor: '#10b981'
                       }}
@@ -962,7 +974,7 @@ excelData.sort((a, b) => {
 
           {/* Cancelled Orders */}
           <div className="col-xl-3 col-lg-4 col-md-6">
-            <div 
+            <div
               className="card border-0 shadow-sm cursor-pointer hover-lift"
               onClick={() => handleFilterOrders('Canceled')}
               style={{
@@ -988,9 +1000,9 @@ excelData.sort((a, b) => {
                 <p className="text-muted mb-0">Canceled Orders</p>
                 <div className="mt-3">
                   <div className="progress" style={{ height: '4px' }}>
-                    <div 
-                      className="progress-bar" 
-                      style={{ 
+                    <div
+                      className="progress-bar"
+                      style={{
                         width: `${orders.length > 0 ? (orders.filter(o => o.status === "Canceled").length / orders.length * 100) : 0}%`,
                         backgroundColor: '#ef4444'
                       }}
@@ -1034,7 +1046,7 @@ excelData.sort((a, b) => {
                     Showing: <span className="fw-bold">{filteredOrders.length}</span> of {orders.length}
                   </span>
                   {statusFilter !== "All" && (
-                    <span 
+                    <span
                       className="badge px-3 py-2"
                       style={{
                         backgroundColor: getStatusBackgroundColor(statusFilter),
@@ -1055,7 +1067,7 @@ excelData.sort((a, b) => {
           <div className="card-header bg-dark text-white d-flex justify-content-between align-items-center">
             <h5 className="mb-0">Orders List ({filteredOrders.length} orders)</h5>
             {statusFilter !== "All" && (
-              <span 
+              <span
                 className="badge"
                 style={{
                   backgroundColor: getStatusBackgroundColor(statusFilter),
@@ -1094,7 +1106,11 @@ excelData.sort((a, b) => {
                         {order.utr}
                       </code>
                     </td>
-                    <td>{order.date ? new Date(order.date).toLocaleDateString() : "N/A"}</td>
+                    <td>
+                      {order.date && !isNaN(new Date(order.date))
+                        ? new Date(order.date).toISOString().slice(0, 10)
+                        : "N/A"}
+                    </td>
                     <td>
                       <span className="badge bg-secondary">{order.items} items</span>
                     </td>
@@ -1126,7 +1142,7 @@ excelData.sort((a, b) => {
                         {/* STATUS DROPDOWN (NO ICONS) */}
                         <select
                           className="form-select form-select-sm shadow-sm"
-                          style={{ 
+                          style={{
                             width: "130px",
                             borderLeft: `4px solid ${getStatusTextColor(order.status)}`,
                             backgroundColor: getStatusBackgroundColor(order.status)
@@ -1140,10 +1156,10 @@ excelData.sort((a, b) => {
                             )
                           }
                         >
-                          <option value="Pending" style={{backgroundColor: "#fff3cd"}}>Pending</option>
-                          <option value="Shipped" style={{backgroundColor: "#cfe2ff"}}>Shipped</option>
-                          <option value="Delivered" style={{backgroundColor: "#d1e7dd"}}>Delivered</option>
-                          <option value="Canceled" style={{backgroundColor: "#f8d7da"}}>Canceled</option>
+                          <option value="Pending" style={{ backgroundColor: "#fff3cd" }}>Pending</option>
+                          <option value="Shipped" style={{ backgroundColor: "#cfe2ff" }}>Shipped</option>
+                          <option value="Delivered" style={{ backgroundColor: "#d1e7dd" }}>Delivered</option>
+                          <option value="Canceled" style={{ backgroundColor: "#f8d7da" }}>Canceled</option>
                         </select>
 
                         {/* VIEW BUTTON */}
@@ -1213,20 +1229,20 @@ excelData.sort((a, b) => {
 
       {/* Add CSS styles */}
       <style jsx>{`
-        .cursor-pointer {
-          cursor: pointer;
-        }
-        .hover-lift:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1) !important;
-        }
-        .progress {
-          overflow: hidden;
-        }
-        .progress-bar {
-          border-radius: 2px;
-        }
-      `}</style>
+          .cursor-pointer {
+            cursor: pointer;
+          }
+          .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1) !important;
+          }
+          .progress {
+            overflow: hidden;
+          }
+          .progress-bar {
+            border-radius: 2px;
+          }
+        `}</style>
     </div>
   );
 };
