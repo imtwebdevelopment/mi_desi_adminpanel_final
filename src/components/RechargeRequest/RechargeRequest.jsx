@@ -3,12 +3,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import * as XLSX from "xlsx";
 import { db } from "../../firebase";
 import FixedHeader from "../FixedHeader";
-import {
-  collection,
-  getDocs,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 
 const RechargeRequestList = () => {
   const [requests, setRequests] = useState([]);
@@ -18,13 +13,11 @@ const RechargeRequestList = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Pending"); 
+  const [statusFilter, setStatusFilter] = useState("Pending");
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  /* =========================
-    FETCH PARTNERS
-  ========================= */
+  /* ========================= FETCH PARTNERS ========================= */
   useEffect(() => {
     const fetchPartners = async () => {
       try {
@@ -38,25 +31,32 @@ const RechargeRequestList = () => {
         console.error("Error fetching partners:", err);
       }
     };
-
     fetchPartners();
   }, []);
 
-  /* =========================
-    FETCH RECHARGE REQUESTS
-  ========================= */
+  /* ========================= FETCH RECHARGE REQUESTS ========================= */
   const fetchRechargeRequests = useCallback(async () => {
     setLoading(true);
     try {
       const customersSnap = await getDocs(collection(db, "customers"));
-
       const customerLookup = {};
+      const referralMap = {};
+
       customersSnap.docs.forEach((d) => {
         const data = d.data();
         customerLookup[d.id] = {
           name: data.name || data.fullName || "Unnamed",
-          referredBy: data.referredBy || "Direct",
+          email: data.email || "N/A",
+          usedReferralCode: data.usedReferralCode || null,
+          ownReferralCode: data.customerReferalCode || null
         };
+        if (data.customerReferalCode) {
+          referralMap[data.customerReferalCode] = {
+            name: data.name || "N/A",
+            email: data.email || "N/A",
+            referralCode: data.customerReferalCode
+          };
+        }
       });
 
       const allReqPromises = customersSnap.docs.map(async (customerDoc) => {
@@ -64,14 +64,23 @@ const RechargeRequestList = () => {
         const reqSnap = await getDocs(
           collection(db, `customers/${userId}/rechargeRequest`)
         );
-
         return reqSnap.docs.map((reqDoc) => {
           const data = reqDoc.data();
+          const customer = customerLookup[userId];
+          let referrer = { name: "Direct", email: "N/A", referralCode: "Direct" };
+          if (customer?.usedReferralCode && referralMap[customer.usedReferralCode]) {
+            referrer = referralMap[customer.usedReferralCode];
+          }
           return {
             id: reqDoc.id,
             userId,
-            userName: customerLookup[userId]?.name || "Unknown",
-            referredBy: customerLookup[userId]?.referredBy || "Direct",
+            userName: customer?.name || "Unknown",
+            email: customer?.email || "N/A",
+            referredBy: referrer.referralCode,
+            referredName: referrer.name,
+            referredEmail: referrer.email,
+            triggeredByName: data.triggeredByName || "Direct",
+            triggeredByUid: data.triggeredByUid || "N/A",
             partnerId: data.partnerId || "",
             partnerName: data.partnerName || "",
             displayUtr: data.transactionId || data.utrId || "N/A",
@@ -103,30 +112,27 @@ const RechargeRequestList = () => {
   }, [fetchRechargeRequests]);
 
   const pendingCount = requests.filter(
-  (r) => (r.rechargeStatus || "Pending") === "Pending"
-).length;
+    (r) => (r.rechargeStatus || "Pending") === "Pending"
+  ).length;
+  const successCount = requests.filter(
+    (r) => r.rechargeStatus === "Success"
+  ).length;
+  const rejectedCount = requests.filter(
+    (r) => r.rechargeStatus === "Rejected"
+  ).length;
+  const totalRequests = requests.length;
 
-const successCount = requests.filter(
-  (r) => r.rechargeStatus === "Success"
-).length;
-
-const rejectedCount = requests.filter(
-  (r) => r.rechargeStatus === "Rejected"
-).length;
-
-const totalRequests = requests.length;
-
-  /* =========================
-    FILTER LOGIC
-  ========================= */
+  /* ========================= FILTER LOGIC ========================= */
   const filteredRequests = requests.filter((r) => {
     const term = searchTerm.toLowerCase();
-    const searchMatch =
+    const searchMatch = 
       r.userName?.toLowerCase().includes(term) ||
       r.userId?.toLowerCase().includes(term) ||
       r.partnerName?.toLowerCase().includes(term) ||
       r.displayUtr?.toLowerCase().includes(term) ||
-      r.plan?.rechargeProvider?.toLowerCase().includes(term);
+      r.plan?.rechargeProvider?.toLowerCase().includes(term) ||
+      r.triggeredByName?.toLowerCase().includes(term) ||
+      r.triggeredByUid?.toLowerCase().includes(term);
 
     if (!searchMatch) return false;
 
@@ -136,6 +142,7 @@ const totalRequests = requests.length;
     }
 
     if (!r.requestedDate?.toDate) return true;
+
     const reqDate = r.requestedDate.toDate();
     const from = fromDate ? new Date(fromDate) : null;
     const to = toDate ? new Date(toDate) : null;
@@ -150,9 +157,7 @@ const totalRequests = requests.length;
     return true;
   });
 
-  /* =========================
-    STATUS UPDATE
-  ========================= */
+  /* ========================= STATUS UPDATE ========================= */
   const handleStatusChange = async (userId, requestId, newStatus) => {
     if (newStatus === "Rejected") {
       setRejectModal({ userId, requestId });
@@ -166,7 +171,6 @@ const totalRequests = requests.length;
         `customers/${userId}/rechargeRequest`,
         requestId
       );
-
       await updateDoc(requestRef, {
         rechargeStatus: newStatus,
         rejectedReason: "",
@@ -191,194 +195,194 @@ const totalRequests = requests.length;
     setSearchTerm(value);
   };
 
-  /* =========================
-    EXCEL EXPORT
-  ========================= */
+  /* ========================= EXCEL EXPORT ========================= */
   const handleDownloadExcel = () => {
+    const excelData = filteredRequests.map((r) => ({
+      "Referral Person ID": r.referredBy || "Direct",
+      "Referral Person Name": r.referredName || "Direct",
+      "Referral Person E-MAIL ID": r.referredEmail || "N/A",
+      "Refered By Name": r.triggeredByName || "Direct",
+      "Refered By UID": r.triggeredByUid || "N/A",
+      "UTR ID": r.displayUtr || "N/A",
+      "Plan Price": r.plan?.price || "N/A",
+      "Mobile": r.number || "N/A",
+      "Company Name": r.plan?.rechargeProvider || "N/A",
+      "Rejected Reason": r.rejectedReason || "N/A",
+      "Customer name": r.userName || "N/A",
+      "Mail id": r.email || "N/A",
+      "Status": r.rechargeStatus || "Pending",
+      "Customer Refrall id": r.userId || "N/A",
+      "Date and time": r.requestedDate?.toDate ? r.requestedDate.toDate().toLocaleString() : "N/A"
+    }));
 
-  const excelData = filteredRequests.map((r) => ({
-
-    "Referral Person ID": r.referredBy || "Direct",
-
-    "Referral Person Name": r.userName || "N/A",
-
-    "Referral Person E-MAIL ID": r.email || "N/A",
-
-    "UTR ID": r.displayUtr || "N/A",
-
-    "Plan Price": r.plan?.price || "N/A",
-
-    "Mobile": r.number || "N/A",
-
-    "company Name": r.plan?.rechargeProvider || "N/A",
-
-    "Rejected Reason": r.rejectedReason || "N/A",
-
-    "Customer name": r.userName || "N/A",
-
-    "Mail id": r.email || "N/A",
-
-    "Status": r.rechargeStatus || "Pending",
-
-    "Customer Refrall id": r.userId || "N/A",
-
-    "Date and time": r.requestedDate?.toDate
-      ? r.requestedDate.toDate().toLocaleString()
-      : "N/A"
-
-  }));
-
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Recharge Report");
-
-  XLSX.writeFile(workbook, "Recharge_Requests.xlsx");
-};
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Recharge Report");
+    XLSX.writeFile(workbook, "Recharge_Requests.xlsx");
+  };
 
   const confirmReject = async () => {
-  if (!rejectReason.trim()) {
-    alert("Please enter rejection reason");
-    return;
-  }
+    if (!rejectReason.trim()) {
+      alert("Please enter rejection reason");
+      return;
+    }
 
-  try {
-    setUpdatingId(rejectModal.requestId);
+    try {
+      setUpdatingId(rejectModal.requestId);
+      const requestRef = doc(
+        db,
+        `customers/${rejectModal.userId}/rechargeRequest`,
+        rejectModal.requestId
+      );
+      await updateDoc(requestRef, {
+        rechargeStatus: "Rejected",
+        rejectedReason: rejectReason,
+      });
 
-    const requestRef = doc(
-      db,
-      `customers/${rejectModal.userId}/rechargeRequest`,
-      rejectModal.requestId
-    );
-
-    await updateDoc(requestRef, {
-      rechargeStatus: "Rejected",
-      rejectedReason: rejectReason,
-    });
-
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === rejectModal.requestId && r.userId === rejectModal.userId
-          ? {
-              ...r,
-              rechargeStatus: "Rejected",
-              rejectedReason: rejectReason,
-            }
-          : r
-      )
-    );
-
-    setRejectModal(null);
-    setRejectReason("");
-
-  } catch (err) {
-    console.error(err);
-    alert("Failed to reject request");
-  } finally {
-    setUpdatingId(null);
-  }
-};
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === rejectModal.requestId && r.userId === rejectModal.userId
+            ? { ...r, rechargeStatus: "Rejected", rejectedReason: rejectReason }
+            : r
+        )
+      );
+      setRejectModal(null);
+      setRejectReason("");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to reject request");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   // Status color mapping
   const getStatusColor = (status) => {
-    switch(status) {
-      case "Pending": return "#ffc107"; // Yellow
-      case "Success": return "#198754"; // Green
-      case "Rejected": return "#dc3545"; // Red
-      default: return "#6c757d"; // Gray
+    switch (status) {
+      case "Pending":
+        return "#ffc107"; // Yellow
+      case "Success":
+        return "#198754"; // Green
+      case "Rejected":
+        return "#dc3545"; // Red
+      default:
+        return "#6c757d"; // Gray
     }
   };
 
   const getStatusBackgroundColor = (status) => {
-    switch(status) {
-      case "Pending": return "#fff3cd"; // Light Yellow
-      case "Success": return "#d1e7dd"; // Light Green
-      case "Rejected": return "#f8d7da"; // Light Red
-      default: return "white";
+    switch (status) {
+      case "Pending":
+        return "#fff3cd"; // Light Yellow
+      case "Success":
+        return "#d1e7dd"; // Light Green
+      case "Rejected":
+        return "#f8d7da"; // Light Red
+      default:
+        return "white";
     }
   };
 
   const getStatusBadgeClass = (status) => {
-    switch(status) {
-      case "Success": return "bg-success";
-      case "Rejected": return "bg-danger";
-      case "Pending": return "bg-warning";
-      default: return "bg-secondary";
+    switch (status) {
+      case "Success":
+        return "bg-success";
+      case "Rejected":
+        return "bg-danger";
+      case "Pending":
+        return "bg-warning";
+      default:
+        return "bg-secondary";
     }
   };
 
   const getStatusTextClass = (status) => {
-    switch(status) {
-      case "Success": return "text-success";
-      case "Rejected": return "text-danger";
-      case "Pending": return "text-warning";
-      default: return "text-muted";
+    switch (status) {
+      case "Success":
+        return "text-success";
+      case "Rejected":
+        return "text-danger";
+      case "Pending":
+        return "text-warning";
+      default:
+        return "text-muted";
     }
   };
 
   return (
     <div
-  style={{
-    backgroundColor: "#f4f7f6",
-    minHeight: "100vh",
-    paddingLeft: "20px",
-    paddingRight: "20px"
-  }}
->
+      style={{
+        backgroundColor: "#f4f7f6",
+        minHeight: "100vh",
+        paddingLeft: "20px",
+        paddingRight: "20px"
+      }}
+    >
       <div className="mt-1" style={{ marginLeft: "10px" }}>
-        <div
-  className="row g-4 mb-4 w-100"
-  style={{ marginTop: "40px" }}
->
+        <div className="row g-4 mb-4 w-100" style={{ marginTop: "40px" }}>
+          {/* Pending */}
+          <div className="col-12 col-sm-6 col-lg-3">
+            <div
+              className="card shadow-sm border-0"
+              style={{ background: "#fff3cd", borderLeft: "5px solid #ffc107" }}
+            >
+              <div className="card-body">
+                <h2 className="fw-bold text-warning">{pendingCount}</h2>
+                <p className="mb-1">Pending Requests</p>
+                <small>
+                  {totalRequests ? Math.round((pendingCount / totalRequests) * 100) : 0}% of total
+                </small>
+              </div>
+            </div>
+          </div>
 
-  {/* Pending */}
-  <div className="col-12 col-sm-6 col-lg-3">
-    <div className="card shadow-sm border-0"
-      style={{background:"#fff3cd",borderLeft:"5px solid #ffc107"}}>
-      <div className="card-body">
-        <h2 className="fw-bold text-warning">{pendingCount}</h2>
-        <p className="mb-1">Pending Requests</p>
-        <small>{totalRequests ? Math.round((pendingCount/totalRequests)*100) : 0}% of total</small>
-      </div>
-    </div>
-  </div>
+          {/* Success */}
+          <div className="col-md-3">
+            <div
+              className="card shadow-sm border-0"
+              style={{ background: "#d1e7dd", borderLeft: "5px solid #198754" }}
+            >
+              <div className="card-body">
+                <h2 className="fw-bold text-success">{successCount}</h2>
+                <p className="mb-1">Success Requests</p>
+                <small>
+                  {totalRequests ? Math.round((successCount / totalRequests) * 100) : 0}% of total
+                </small>
+              </div>
+            </div>
+          </div>
 
-  {/* Success */}
-  <div className="col-md-3">
-    <div className="card shadow-sm border-0"
-      style={{background:"#d1e7dd",borderLeft:"5px solid #198754"}}>
-      <div className="card-body">
-        <h2 className="fw-bold text-success">{successCount}</h2>
-        <p className="mb-1">Success Requests</p>
-        <small>{totalRequests ? Math.round((successCount/totalRequests)*100) : 0}% of total</small>
-      </div>
-    </div>
-  </div>
+          {/* Rejected */}
+          <div className="col-md-3">
+            <div
+              className="card shadow-sm border-0"
+              style={{ background: "#f8d7da", borderLeft: "5px solid #dc3545" }}
+            >
+              <div className="card-body">
+                <h2 className="fw-bold text-danger">{rejectedCount}</h2>
+                <p className="mb-1">Rejected Requests</p>
+                <small>
+                  {totalRequests ? Math.round((rejectedCount / totalRequests) * 100) : 0}% of total
+                </small>
+              </div>
+            </div>
+          </div>
 
-  {/* Rejected */}
-  <div className="col-md-3">
-    <div className="card shadow-sm border-0"
-      style={{background:"#f8d7da",borderLeft:"5px solid #dc3545"}}>
-      <div className="card-body">
-        <h2 className="fw-bold text-danger">{rejectedCount}</h2>
-        <p className="mb-1">Rejected Requests</p>
-        <small>{totalRequests ? Math.round((rejectedCount/totalRequests)*100) : 0}% of total</small>
-      </div>
-    </div>
-  </div>
+          {/* Total */}
+          <div className="col-md-3">
+            <div
+              className="card shadow-sm border-0"
+              style={{ background: "#e2e3e5", borderLeft: "5px solid #6c757d" }}
+            >
+              <div className="card-body">
+                <h2 className="fw-bold text-secondary">{totalRequests}</h2>
+                <p className="mb-1">Total Requests</p>
+                <small>All recharge requests</small>
+              </div>
+            </div>
+          </div>
+        </div>
 
-  {/* Total */}
-  <div className="col-md-3">
-    <div className="card shadow-sm border-0"
-      style={{background:"#e2e3e5",borderLeft:"5px solid #6c757d"}}>
-      <div className="card-body">
-        <h2 className="fw-bold text-secondary">{totalRequests}</h2>
-        <p className="mb-1">Total Requests</p>
-        <small>All recharge requests</small>
-      </div>
-    </div>
-  </div>
-
-</div>
         <FixedHeader onSearchChange={handleSearchChange} />
 
         <div className="bg-white border rounded-3 shadow-sm p-3 mb-4">
@@ -396,18 +400,37 @@ const totalRequests = requests.length;
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{
                   borderLeft: `4px solid ${
-                    statusFilter === "All" ? "#6c757d" : 
-                    statusFilter === "Pending" ? "#ffc107" :
-                    statusFilter === "Success" ? "#198754" : "#dc3545"
+                    statusFilter === "All"
+                      ? "#6c757d"
+                      : statusFilter === "Pending"
+                      ? "#ffc107"
+                      : statusFilter === "Success"
+                      ? "#198754"
+                      : "#dc3545"
                   }`,
                   backgroundColor: getStatusBackgroundColor(statusFilter),
                   fontWeight: "bold"
                 }}
               >
                 <option value="All">All Requests</option>
-                <option value="Pending" style={{color: "#ffc107", fontWeight: "bold", backgroundColor: "#fff3cd"}}>Pending</option>
-                <option value="Success" style={{color: "#198754", fontWeight: "bold", backgroundColor: "#d1e7dd"}}>Success</option>
-                <option value="Rejected" style={{color: "#dc3545", fontWeight: "bold", backgroundColor: "#f8d7da"}}>Rejected</option>
+                <option
+                  value="Pending"
+                  style={{ color: "#ffc107", fontWeight: "bold", backgroundColor: "#fff3cd" }}
+                >
+                  Pending
+                </option>
+                <option
+                  value="Success"
+                  style={{ color: "#198754", fontWeight: "bold", backgroundColor: "#d1e7dd" }}
+                >
+                  Success
+                </option>
+                <option
+                  value="Rejected"
+                  style={{ color: "#dc3545", fontWeight: "bold", backgroundColor: "#f8d7da" }}
+                >
+                  Rejected
+                </option>
               </select>
             </div>
 
@@ -478,6 +501,7 @@ const totalRequests = requests.length;
                       <td className="ps-4 d-none d-md-table-cell">
                         <div className="fw-bold">{r.userName}</div>
                         <div className="text-muted small">ID: {r.userId}</div>
+                        <div className="text-muted small">Triggered By: {r.triggeredByName}</div>
                       </td>
                       <td className="d-none d-md-table-cell">
                         <code className="small bg-light px-2 py-1">{r.displayUtr}</code>
@@ -487,7 +511,9 @@ const totalRequests = requests.length;
                       <td className="d-none d-md-table-cell">{r.plan?.rechargeProvider || "—"}</td>
                       <td className="d-none d-md-table-cell">
                         <select
-                          className={`form-select form-select-sm fw-bold ${getStatusTextClass(r.rechargeStatus || "Pending")}`}
+                          className={`form-select form-select-sm fw-bold ${getStatusTextClass(
+                            r.rechargeStatus || "Pending"
+                          )}`}
                           value={r.rechargeStatus || "Pending"}
                           onChange={(e) => handleStatusChange(r.userId, r.id, e.target.value)}
                           disabled={updatingId === r.id}
@@ -496,9 +522,15 @@ const totalRequests = requests.length;
                             backgroundColor: getStatusBackgroundColor(r.rechargeStatus || "Pending")
                           }}
                         >
-                          <option value="Pending" style={{color: "#ffc107", backgroundColor: "#fff3cd"}}>Pending</option>
-                          <option value="Success" style={{color: "#198754", backgroundColor: "#d1e7dd"}}>Success</option>
-                          <option value="Rejected" style={{color: "#dc3545", backgroundColor: "#f8d7da"}}>Rejected</option>
+                          <option value="Pending" style={{ color: "#ffc107", backgroundColor: "#fff3cd" }}>
+                            Pending
+                          </option>
+                          <option value="Success" style={{ color: "#198754", backgroundColor: "#d1e7dd" }}>
+                            Success
+                          </option>
+                          <option value="Rejected" style={{ color: "#dc3545", backgroundColor: "#f8d7da" }}>
+                            Rejected
+                          </option>
                         </select>
                         {r.rechargeStatus === "Rejected" && r.rejectedReason && (
                           <div className="text-danger small mt-1">⚠ {r.rejectedReason}</div>
@@ -509,7 +541,9 @@ const totalRequests = requests.length;
                       <td colSpan="6" className="d-md-none p-3">
                         <div className="d-flex justify-content-between align-items-center">
                           <div className="fw-bold">{r.userName}</div>
-                          <span className={`badge ${getStatusBadgeClass(r.rechargeStatus || "Pending")} px-3 py-2`}>
+                          <span
+                            className={`badge ${getStatusBadgeClass(r.rechargeStatus || "Pending")} px-3 py-2`}
+                          >
                             {r.rechargeStatus || "Pending"}
                           </span>
                         </div>
@@ -518,6 +552,7 @@ const totalRequests = requests.length;
                             <div className="col-6"><strong>Mobile:</strong> {r.number}</div>
                             <div className="col-6"><strong>Amount:</strong> ₹{r.plan?.price}</div>
                             <div className="col-12 mt-1"><strong>UTR:</strong> {r.displayUtr}</div>
+                            <div className="col-12 mt-1"><strong>Triggered By:</strong> {r.triggeredByName}</div>
                           </div>
                         </div>
                         <select
@@ -529,9 +564,15 @@ const totalRequests = requests.length;
                             backgroundColor: getStatusBackgroundColor(r.rechargeStatus || "Pending")
                           }}
                         >
-                          <option value="Pending" style={{color: "#ffc107", backgroundColor: "#fff3cd"}}>Pending</option>
-                          <option value="Success" style={{color: "#198754", backgroundColor: "#d1e7dd"}}>Success</option>
-                          <option value="Rejected" style={{color: "#dc3545", backgroundColor: "#f8d7da"}}>Rejected</option>
+                          <option value="Pending" style={{ color: "#ffc107", backgroundColor: "#fff3cd" }}>
+                            Pending
+                          </option>
+                          <option value="Success" style={{ color: "#198754", backgroundColor: "#d1e7dd" }}>
+                            Success
+                          </option>
+                          <option value="Rejected" style={{ color: "#dc3545", backgroundColor: "#f8d7da" }}>
+                            Rejected
+                          </option>
                         </select>
                         {r.rechargeStatus === "Rejected" && r.rejectedReason && (
                           <div className="text-danger small mt-2 p-2 bg-light rounded">
@@ -555,7 +596,10 @@ const totalRequests = requests.length;
             <div className="modal-content">
               <div className="modal-header bg-danger text-white">
                 <h5 className="modal-title">Reject Recharge Request</h5>
-                <button className="btn-close btn-close-white" onClick={() => setRejectModal(null)}></button>
+                <button
+                  className="btn-close btn-close-white"
+                  onClick={() => setRejectModal(null)}
+                ></button>
               </div>
               <div className="modal-body">
                 <label className="fw-bold mb-2">Reason for Rejection</label>
@@ -568,8 +612,12 @@ const totalRequests = requests.length;
                 />
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setRejectModal(null)}>Cancel</button>
-                <button className="btn btn-danger" onClick={confirmReject}>Confirm Reject</button>
+                <button className="btn btn-secondary" onClick={() => setRejectModal(null)}>
+                  Cancel
+                </button>
+                <button className="btn btn-danger" onClick={confirmReject}>
+                  Confirm Reject
+                </button>
               </div>
             </div>
           </div>
