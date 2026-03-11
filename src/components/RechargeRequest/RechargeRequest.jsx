@@ -79,7 +79,7 @@ const RechargeRequestList = () => {
             referredBy: referrer.referralCode,
             referredName: referrer.name,
             referredEmail: referrer.email,
-            triggeredByName: data.triggeredByName || "Direct",
+            triggeredByName: data.triggeredByName || "Super Admin",
             triggeredByUid: data.triggeredByUid || "N/A",
             partnerId: data.partnerId || "",
             partnerName: data.partnerName || "",
@@ -125,7 +125,7 @@ const RechargeRequestList = () => {
   /* ========================= FILTER LOGIC ========================= */
   const filteredRequests = requests.filter((r) => {
     const term = searchTerm.toLowerCase();
-    const searchMatch = 
+    const searchMatch =
       r.userName?.toLowerCase().includes(term) ||
       r.userId?.toLowerCase().includes(term) ||
       r.partnerName?.toLowerCase().includes(term) ||
@@ -198,21 +198,37 @@ const RechargeRequestList = () => {
   /* ========================= EXCEL EXPORT ========================= */
   const handleDownloadExcel = () => {
     const excelData = filteredRequests.map((r) => ({
+
       "Referral Person ID": r.referredBy || "Direct",
+
       "Referral Person Name": r.referredName || "Direct",
+
       "Referral Person E-MAIL ID": r.referredEmail || "N/A",
-      "Refered By Name": r.triggeredByName || "Direct",
-      "Refered By UID": r.triggeredByUid || "N/A",
+
+      "Partner Name": r.triggeredByName ? r.triggeredByName : "Super Admin",
+
       "UTR ID": r.displayUtr || "N/A",
+
       "Plan Price": r.plan?.price || "N/A",
+
       "Mobile": r.number || "N/A",
+
       "Company Name": r.plan?.rechargeProvider || "N/A",
+
       "Rejected Reason": r.rejectedReason || "N/A",
+
       "Customer name": r.userName || "N/A",
+
       "Mail id": r.email || "N/A",
+
       "Status": r.rechargeStatus || "Pending",
+
       "Customer Refrall id": r.userId || "N/A",
-      "Date and time": r.requestedDate?.toDate ? r.requestedDate.toDate().toLocaleString() : "N/A"
+
+      "Date and time": r.requestedDate?.toDate
+        ? r.requestedDate.toDate().toLocaleString()
+        : "N/A"
+
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -399,15 +415,14 @@ const RechargeRequestList = () => {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{
-                  borderLeft: `4px solid ${
-                    statusFilter === "All"
+                  borderLeft: `4px solid ${statusFilter === "All"
                       ? "#6c757d"
                       : statusFilter === "Pending"
-                      ? "#ffc107"
-                      : statusFilter === "Success"
-                      ? "#198754"
-                      : "#dc3545"
-                  }`,
+                        ? "#ffc107"
+                        : statusFilter === "Success"
+                          ? "#198754"
+                          : "#dc3545"
+                    }`,
                   backgroundColor: getStatusBackgroundColor(statusFilter),
                   fontWeight: "bold"
                 }}
