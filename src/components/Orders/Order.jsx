@@ -212,159 +212,195 @@ const OrderPage = ({ onNavigate }) => {
 
   const downloadOrdersExcel = async () => {
 
-    const excelData = [];
+  const excelData = [];
 
-    const customersSnap = await getDocs(
-      collection(db, CUSTOMER_COLLECTION_NAME)
+  const customersSnap = await getDocs(
+    collection(db, CUSTOMER_COLLECTION_NAME)
+  );
+
+  /* ---------------------------------
+     CREATE REFERRAL LOOKUP MAP
+     customerReferalCode -> customer
+  --------------------------------- */
+
+  const referralMap = {};
+
+  customersSnap.docs.forEach((docSnap) => {
+
+    const data = docSnap.data();
+
+    if (data.customerReferalCode) {
+
+      referralMap[data.customerReferalCode] = {
+        name: data.name || "N/A",
+        email: data.email || "N/A",
+        referralCode: data.customerReferalCode
+      };
+
+    }
+
+  });
+
+  /* ---------------------------------
+     LOOP CUSTOMERS
+  --------------------------------- */
+
+  for (const customerDoc of customersSnap.docs) {
+
+    const customerId = customerDoc.id;
+    const customer = customerDoc.data();
+
+    /* -------- FIND REFERRER -------- */
+
+    let referrer = {
+      name: "Direct",
+      email: "N/A",
+      referralCode: "Direct"
+    };
+
+    if (customer.usedReferralCode && referralMap[customer.usedReferralCode]) {
+
+      referrer = referralMap[customer.usedReferralCode];
+
+    }
+
+    /* ---------- ADDRESS FETCH ---------- */
+
+    let addressData = {};
+
+    const addressSnap = await getDocs(
+      collection(db, CUSTOMER_COLLECTION_NAME, customerId, "address")
     );
 
-    for (const customerDoc of customersSnap.docs) {
+    if (!addressSnap.empty) {
+      addressData = addressSnap.docs[0].data();
+    }
 
-      const customerId = customerDoc.id;
-      const customer = customerDoc.data();
+    /* ---------- ORDERS FETCH ---------- */
 
-      /* ---------- ADDRESS FETCH ---------- */
+    const ordersSnap = await getDocs(
+      collection(
+        db,
+        CUSTOMER_COLLECTION_NAME,
+        customerId,
+        ORDER_SUBCOLLECTION_NAME
+      )
+    );
 
-      let addressData = {};
+    for (const orderDoc of ordersSnap.docs) {
 
-      const addressSnap = await getDocs(
-        collection(db, CUSTOMER_COLLECTION_NAME, customerId, "address")
-      );
+      const data = orderDoc.data();
 
-      if (!addressSnap.empty) {
-        addressData = addressSnap.docs[0].data();
-      }
+      const orderDateObj = data.createdAt?.toDate
+        ? data.createdAt.toDate()
+        : null;
 
-      /* ---------- ORDERS FETCH ---------- */
+      if (fromDate && orderDateObj && orderDateObj < new Date(fromDate)) continue;
+      if (toDate && orderDateObj && orderDateObj > new Date(toDate)) continue;
 
-      const ordersSnap = await getDocs(
-        collection(
-          db,
-          CUSTOMER_COLLECTION_NAME,
-          customerId,
-          ORDER_SUBCOLLECTION_NAME
-        )
-      );
+      const orderDate = orderDateObj
+        ? orderDateObj.toISOString().split("T")[0]
+        : "N/A";
 
-      for (const orderDoc of ordersSnap.docs) {
+      const products = data.products || [];
 
-        const data = orderDoc.data();
+      products.forEach((item) => {
 
-        const orderDateObj = data.createdAt?.toDate
-          ? data.createdAt.toDate()
-          : null;
+        const status = data.status || data.orderStatus || "Pending";
 
-        if (fromDate && orderDateObj && orderDateObj < new Date(fromDate)) continue;
-        if (toDate && orderDateObj && orderDateObj > new Date(toDate)) continue;
+        if (statusFilter !== "All" && status !== statusFilter) return;
 
-        const orderDate = orderDateObj
-          ? orderDateObj.toISOString().split("T")[0]
-          : "N/A";
+        const product = item.product ? item.product : item;
 
-        const products = data.products || [];
+        excelData.push({
 
-        products.forEach((item) => {
-          const status = data.status || data.orderStatus || "Pending";
+          "Order ID": data.orderId || orderDoc.id,
 
-          if (statusFilter !== "All" && status !== statusFilter) return;
+          /* ---------------- REFERRAL PERSON ---------------- */
 
-          const product = item.product ? item.product : item;
-          excelData.push({
+          "Referral Person ID": referrer.referralCode,
 
-            "Order ID": data.orderId || orderDoc.id,
+          "Referral Person Name": referrer.name,
 
-            "Referral Person ID":
-              customer.customerReferalCode ||
-              customer.referralCode ||
-              customer.referredBy ||
-              customer.partnerReferalCode ||
-              "Direct",
+          "Referral Person E-MAIL ID": referrer.email,
 
-            "Referral Person Name":
-              customer.referredByName ||
-              customer.partnerName ||
-              "N/A",
+          /* ---------------- CUSTOMER ---------------- */
 
-            "Referral Person E-MAIL ID":
-              customer.partnerEmail ||
-              customer.email ||
-              "N/A",
+          "Customer Name": customer.name || "N/A",
 
-            "Customer Name":
-              customer.name || "N/A",
+          /* ---------------- PRODUCT ---------------- */
 
-            "Product Name":
-              product.title ||
-              product.name ||
-              product.productName ||
-              "N/A",
+          "Product Name":
+            product.title ||
+            product.name ||
+            product.productName ||
+            "N/A",
 
-            "Quantity":
-              Number(item.quantity) || 1,
+          "Quantity":
+            Number(item.quantity) || 1,
 
-            "Purchased Amount":
-              (Number(product.price) || 0) * (Number(item.quantity) || 1),
+          "Purchased Amount":
+            (Number(product.price) || 0) *
+            (Number(item.quantity) || 1),
 
-            "Status":
-              status,
+          "Status": status,
 
-            "Address":
-              addressData.streetName || "",
+          /* ---------------- ADDRESS ---------------- */
 
-            "City":
-              addressData.city || "",
+          "Address": addressData.streetName || "",
 
-            "State":
-              addressData.state || "",
+          "City": addressData.city || "",
 
-            "Mail":
-              addressData.email || "",
+          "State": addressData.state || "",
 
-            "Mobile Number":
-              addressData.phoneNumber ||
-              data.phoneNumber ||
-              "",
+          "Mail": addressData.email || "",
 
-            "Customer Referral id":
-              customer.referralCode ||
-              customer.customerReferalCode ||
-              customer.referredBy ||
-              "Direct",
+          "Mobile Number":
+            addressData.phoneNumber ||
+            data.phoneNumber ||
+            "",
 
-            "Date":
-              orderDate
-          });
+          /* ---------------- CUSTOMER REFERRAL ---------------- */
+
+          "Customer Referral ID":
+            customer.customerReferalCode || "N/A",
+
+          "Date": orderDate
 
         });
-      }
+
+      });
+
     }
 
-    if (excelData.length === 0) {
-      alert("No orders found");
-      return;
-    }
+  }
 
-    excelData.sort((a, b) => {
-      if (a.Date === "N/A" || b.Date === "N/A") return 0;
-      return new Date(a.Date) - new Date(b.Date);
-    });
+  if (excelData.length === 0) {
+    alert("No orders found");
+    return;
+  }
 
+  excelData.sort((a, b) => {
+    if (a.Date === "N/A" || b.Date === "N/A") return 0;
+    return new Date(a.Date) - new Date(b.Date);
+  });
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-    const workbook = XLSX.utils.book_new();
+  const workbook = XLSX.utils.book_new();
 
-    XLSX.utils.book_append_sheet(
-      workbook,
-      worksheet,
-      "Orders Report"
-    );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    worksheet,
+    "Orders Report"
+  );
 
-    XLSX.writeFile(
-      workbook,
-      `Orders_Report_${new Date().toISOString().slice(0, 10)}.xlsx`
-    );
-  };
+  XLSX.writeFile(
+    workbook,
+    `Orders_Report_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+
+};
 
   /* -------------------------- EXTRACT PRODUCT DATA -------------------------- */
   const extractProductData = (item) => {
