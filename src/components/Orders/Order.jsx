@@ -212,195 +212,217 @@ const OrderPage = ({ onNavigate }) => {
 
   const downloadOrdersExcel = async () => {
 
-  const excelData = [];
+    const excelData = [];
 
-  const customersSnap = await getDocs(
-    collection(db, CUSTOMER_COLLECTION_NAME)
-  );
+    const customersSnap = await getDocs(
+      collection(db, CUSTOMER_COLLECTION_NAME)
+    );
 
-  /* ---------------------------------
-     CREATE REFERRAL LOOKUP MAP
-     customerReferalCode -> customer
-  --------------------------------- */
+    /* ---------------------------------
+       CREATE REFERRAL LOOKUP MAP
+       customerReferalCode -> customer
+    --------------------------------- */
 
-  const referralMap = {};
+    const referralMap = {};
 
-  customersSnap.docs.forEach((docSnap) => {
+    customersSnap.docs.forEach((docSnap) => {
 
-    const data = docSnap.data();
+      const data = docSnap.data();
 
-    if (data.customerReferalCode) {
+      if (data.customerReferalCode) {
 
-      referralMap[data.customerReferalCode] = {
-        name: data.name || "N/A",
-        email: data.email || "N/A",
-        referralCode: data.customerReferalCode
+        referralMap[data.customerReferalCode] = {
+          name: data.name || "N/A",
+          email: data.email || "N/A",
+          referralCode: data.customerReferalCode
+        };
+
+      }
+
+    });
+
+    /* ---------------------------------
+       LOOP CUSTOMERS
+    --------------------------------- */
+
+    for (const customerDoc of customersSnap.docs) {
+
+      const customerId = customerDoc.id;
+      const customer = customerDoc.data();
+
+      /* -------- FIND REFERRER -------- */
+
+      let referrer = {
+        name: "Direct",
+        email: "N/A",
+        referralCode: "Direct"
       };
 
-    }
+      if (customer.usedReferralCode && referralMap[customer.usedReferralCode]) {
 
-  });
+        referrer = referralMap[customer.usedReferralCode];
 
-  /* ---------------------------------
-     LOOP CUSTOMERS
-  --------------------------------- */
+      }
 
-  for (const customerDoc of customersSnap.docs) {
+      /* ---------- ADDRESS FETCH ---------- */
 
-    const customerId = customerDoc.id;
-    const customer = customerDoc.data();
+      let addressData = {};
 
-    /* -------- FIND REFERRER -------- */
+      const addressSnap = await getDocs(
+        collection(db, CUSTOMER_COLLECTION_NAME, customerId, "address")
+      );
 
-    let referrer = {
-      name: "Direct",
-      email: "N/A",
-      referralCode: "Direct"
-    };
+      if (!addressSnap.empty) {
+        addressData = addressSnap.docs[0].data();
+      }
 
-    if (customer.usedReferralCode && referralMap[customer.usedReferralCode]) {
+      /* ---------- ORDERS FETCH ---------- */
 
-      referrer = referralMap[customer.usedReferralCode];
+      const ordersSnap = await getDocs(
+        collection(
+          db,
+          CUSTOMER_COLLECTION_NAME,
+          customerId,
+          ORDER_SUBCOLLECTION_NAME
+        )
+      );
 
-    }
+      for (const orderDoc of ordersSnap.docs) {
 
-    /* ---------- ADDRESS FETCH ---------- */
+        const data = orderDoc.data();
 
-    let addressData = {};
+        const orderDateObj = data.createdAt?.toDate
+          ? data.createdAt.toDate()
+          : null;
 
-    const addressSnap = await getDocs(
-      collection(db, CUSTOMER_COLLECTION_NAME, customerId, "address")
-    );
+        let orderDate = "";
 
-    if (!addressSnap.empty) {
-      addressData = addressSnap.docs[0].data();
-    }
+        if (orderDateObj) {
+          const y = orderDateObj.getFullYear();
+          const m = String(orderDateObj.getMonth() + 1).padStart(2, "0");
+          const d = String(orderDateObj.getDate()).padStart(2, "0");
+          orderDate = `${y}-${m}-${d}`;
+        }
 
-    /* ---------- ORDERS FETCH ---------- */
+        /* DATE FILTER */
 
-    const ordersSnap = await getDocs(
-      collection(
-        db,
-        CUSTOMER_COLLECTION_NAME,
-        customerId,
-        ORDER_SUBCOLLECTION_NAME
-      )
-    );
+        const orderTime = orderDateObj ? orderDateObj.getTime() : null;
 
-    for (const orderDoc of ordersSnap.docs) {
+        if (fromDate) {
+          const fromTime = new Date(fromDate + "T00:00:00").getTime();
+          if (orderTime && orderTime < fromTime) continue;
+        }
 
-      const data = orderDoc.data();
+        if (toDate) {
+          const toTime = new Date(toDate + "T23:59:59").getTime();
+          if (orderTime && orderTime > toTime) continue;
+        }
 
-      const orderDateObj = data.createdAt?.toDate
-        ? data.createdAt.toDate()
-        : null;
-
-      if (fromDate && orderDateObj && orderDateObj < new Date(fromDate)) continue;
-      if (toDate && orderDateObj && orderDateObj > new Date(toDate)) continue;
-
-      const orderDate = orderDateObj
-        ? orderDateObj.toISOString().split("T")[0]
-        : "N/A";
-
-      const products = data.products || [];
-
-      products.forEach((item) => {
+        const products = data.products || [];
 
         const status = data.status || data.orderStatus || "Pending";
 
-        if (statusFilter !== "All" && status !== statusFilter) return;
+        /* STATUS FILTER */
 
-        const product = item.product ? item.product : item;
+        if (statusFilter !== "All" && status !== statusFilter) {
+          continue;
+        }
 
-        excelData.push({
+        for (const item of products) {
 
-          "Order ID": data.orderId || orderDoc.id,
+          const product = item.product ? item.product : item;
 
-          /* ---------------- REFERRAL PERSON ---------------- */
+          excelData.push({
 
-          "Referral Person ID": referrer.referralCode,
+            "Order ID": data.orderId || orderDoc.id,
 
-          "Referral Person Name": referrer.name,
+            /* ---------------- REFERRAL PERSON ---------------- */
 
-          "Referral Person E-MAIL ID": referrer.email,
+            "Referral Person ID": referrer.referralCode,
 
-          /* ---------------- CUSTOMER ---------------- */
+            "Referral Person Name": referrer.name,
 
-          "Customer Name": customer.name || "N/A",
+            "Referral Person E-MAIL ID": referrer.email,
 
-          /* ---------------- PRODUCT ---------------- */
+            /* ---------------- CUSTOMER ---------------- */
 
-          "Product Name":
-            product.title ||
-            product.name ||
-            product.productName ||
-            "N/A",
+            "Customer Name": customer.name || "N/A",
 
-          "Quantity":
-            Number(item.quantity) || 1,
+            /* ---------------- PRODUCT ---------------- */
 
-          "Purchased Amount":
-            (Number(product.price) || 0) *
-            (Number(item.quantity) || 1),
+            "Product Name":
+              product.title ||
+              product.name ||
+              product.productName ||
+              "N/A",
 
-          "Status": status,
+            "Quantity":
+              Number(item.quantity) || 1,
 
-          /* ---------------- ADDRESS ---------------- */
+            "Purchased Amount":
+              (Number(product.price) || 0) *
+              (Number(item.quantity) || 1),
 
-          "Address": addressData.streetName || "",
+            "Status": status,
 
-          "City": addressData.city || "",
+            /* ---------------- ADDRESS ---------------- */
 
-          "State": addressData.state || "",
+            "Address": addressData.streetName || "",
 
-          "Mail": addressData.email || "",
+            "City": addressData.city || "",
 
-          "Mobile Number":
-            addressData.phoneNumber ||
-            data.phoneNumber ||
-            "",
+            "State": addressData.state || "",
 
-          /* ---------------- CUSTOMER REFERRAL ---------------- */
+            "Postal code": addressData.pinCode || addressData.pincode || "",
 
-          "Customer Referral ID":
-            customer.customerReferalCode || "N/A",
+            "Mail": addressData.email || "",
 
-          "Date": orderDate
+            "Mobile Number":
+              addressData.phoneNumber ||
+              data.phoneNumber ||
+              "",
 
-        });
+            /* ---------------- CUSTOMER REFERRAL ---------------- */
 
-      });
+            "Customer Referral ID":
+              customer.customerReferalCode || "N/A",
+
+            "Date": orderDate
+
+          });
+
+        };
+
+      }
 
     }
 
-  }
+    if (excelData.length === 0) {
+      alert("No orders found");
+      return;
+    }
 
-  if (excelData.length === 0) {
-    alert("No orders found");
-    return;
-  }
+    excelData.sort((a, b) => {
+      if (a.Date === "N/A" || b.Date === "N/A") return 0;
+      return new Date(a.Date) - new Date(b.Date);
+    });
 
-  excelData.sort((a, b) => {
-    if (a.Date === "N/A" || b.Date === "N/A") return 0;
-    return new Date(a.Date) - new Date(b.Date);
-  });
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
 
-  const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Orders Report"
+    );
 
-  XLSX.utils.book_append_sheet(
-    workbook,
-    worksheet,
-    "Orders Report"
-  );
+    XLSX.writeFile(
+      workbook,
+      `Orders_${fromDate || "ALL"}_${toDate || "ALL"}.xlsx`
+    );
 
-  XLSX.writeFile(
-    workbook,
-    `Orders_Report_${new Date().toISOString().slice(0, 10)}.xlsx`
-  );
-
-};
+  };
 
   /* -------------------------- EXTRACT PRODUCT DATA -------------------------- */
   const extractProductData = (item) => {
