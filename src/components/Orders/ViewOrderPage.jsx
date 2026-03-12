@@ -114,11 +114,7 @@ const ViewOrderModal = ({ order, onClose }) => {
       0
     ) || 0;
 
-  const deliveryCharges =
-    orderData?.products?.reduce(
-      (sum, item) => sum + Number(item.product?.deliveryCharges || 0),
-      0
-    ) || 0;
+  const deliveryCharges = 149;
 
   const totalAmount = Number(orderData?.totalAmount || 0);
   const totalQuantity =
@@ -393,20 +389,7 @@ const ViewOrderModal = ({ order, onClose }) => {
                                         Stock: {p.stock}
                                       </span>
                                     </div>
-                                    <div className="row small">
-                                      <div className="col-6">
-                                        <p className="mb-1">
-                                          <span className="text-muted">Tax:</span>{" "}
-                                          <span className="fw-medium">₹{p.taxAmount}</span>
-                                        </p>
-                                      </div>
-                                      <div className="col-6">
-                                        <p className="mb-1">
-                                          <span className="text-muted">Delivery:</span>{" "}
-                                          <span className="fw-medium">₹{p.deliveryCharges}</span>
-                                        </p>
-                                      </div>
-                                    </div>
+                                 
                                   </div>
 
                                   {/* Price Details */}
@@ -463,16 +446,8 @@ const ViewOrderModal = ({ order, onClose }) => {
                       <div className="col-md-8 col-lg-6">
                         <div className="border rounded-3 p-4 bg-white shadow-sm">
                           <div className="d-flex justify-content-between align-items-center mb-3">
-                            <span className="text-muted">Subtotal</span>
+                            <span className="text-muted">Payable Amount</span>
                             <span className="fw-bold">₹{subtotal.toFixed(2)}</span>
-                          </div>
-
-                          <div className="d-flex justify-content-between align-items-center mb-3">
-                            <span className="text-muted">
-                              <i className="bi bi-percent me-1"></i>
-                              Tax Amount
-                            </span>
-                            <span className="fw-bold text-warning">₹{taxAmount.toFixed(2)}</span>
                           </div>
 
                           <div className="d-flex justify-content-between align-items-center mb-4">

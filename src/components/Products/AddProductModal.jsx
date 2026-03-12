@@ -5,7 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 
 
- 
+
 /* CATEGORY FETCH */
 const useCategoryFetcher = () => {
   const [categories, setCategories] = useState([]);
@@ -33,24 +33,24 @@ const useCategoryFetcher = () => {
 const useBrandFetcher = () => {
   const [brands, setBrands] = useState([]);
 
- useEffect(() => {
-  const run = async () => {
-    try {
-      const snap = await getDocs(collection(db, "brands"));
-      setBrands(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().brandName,
-          categoryId: d.data().categoryId || "",
-          subCategoryId: d.data().subCategoryId || "",
-        }))
-      );
-    } catch (e) {
-      console.error("Brand fetch error:", e);
-    }
-  };
-  run();
-}, []);
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const snap = await getDocs(collection(db, "brands"));
+        setBrands(
+          snap.docs.map((d) => ({
+            id: d.id,
+            name: d.data().brandName,
+            categoryId: d.data().categoryId || "",
+            subCategoryId: d.data().subCategoryId || "",
+          }))
+        );
+      } catch (e) {
+        console.error("Brand fetch error:", e);
+      }
+    };
+    run();
+  }, []);
 
   return { brands };
 };
@@ -72,57 +72,57 @@ const AddProductModal = ({ onClose, onAdd, sellerId }) => {
   const { categories } = useCategoryFetcher();
   const { brands } = useBrandFetcher();
 
-   const [subCategories, setSubCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
 
   const [filteredBrands, setFilteredBrands] = useState([]);
 
   /* MEDIA STATE */
-const [form, setForm] = useState({
-  title: "",
-  description: "",
-  price: "",
-  offerPrice: "",
-  stock: "",
-  taxAmount: "",
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    price: "",
+    offerPrice: "",
+    stock: "",
+    taxAmount: "",
 
-  categoryId: "",
-  categoryName: "",
+    categoryId: "",
+    categoryName: "",
 
-  subCategoryId: "",
-  subCategoryName: "",
+    subCategoryId: "",
+    subCategoryName: "",
 
-  brandId: "",
-  brandName: "",
+    brandId: "",
+    brandName: "",
 
-  cashOnDelivery: "Yes",
-  isBestSelling: false,
-  rating: "",
+    cashOnDelivery: "Yes",
+    isBestSelling: false,
+    rating: "",
 
-  deliveryCharges: "",
-  productCode: "",
-  hsnCode: "",
-  sellerid: sellerId || "",
-});
+    deliveryCharges: "",
+    productCode: "",
+    hsnCode: "",
+    sellerid: sellerId || "",
+  });
 
 
-useEffect(() => {
-  const fetchSubCategories = async () => {
-    try {
-      const snap = await getDocs(collection(db, "subcategories"));
-      setSubCategories(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().subCategoryName,
-          categoryId: d.data().categoryId || "", // optional
-        }))
-      );
-    } catch (e) {
-      console.error("Subcategory fetch error:", e);
-    }
-  };
+  useEffect(() => {
+    const fetchSubCategories = async () => {
+      try {
+        const snap = await getDocs(collection(db, "subcategories"));
+        setSubCategories(
+          snap.docs.map((d) => ({
+            id: d.id,
+            name: d.data().subCategoryName,
+            categoryId: d.data().categoryId || "", // optional
+          }))
+        );
+      } catch (e) {
+        console.error("Subcategory fetch error:", e);
+      }
+    };
 
-  fetchSubCategories();
-}, []);
+    fetchSubCategories();
+  }, []);
 
 
 
@@ -135,18 +135,18 @@ useEffect(() => {
       return;
     }
 
-if (name === "categoryId") {
-  const c = categories.find((x) => x.id === value);
+    if (name === "categoryId") {
+      const c = categories.find((x) => x.id === value);
 
-  setForm((p) => ({
-    ...p,
-    categoryId: value,
-    categoryName: c?.name || "",
-    subCategoryId: "",
-    subCategoryName: "",
-  }));
-  return;
-}
+      setForm((p) => ({
+        ...p,
+        categoryId: value,
+        categoryName: c?.name || "",
+        subCategoryId: "",
+        subCategoryName: "",
+      }));
+      return;
+    }
 
 
     if (name === "brandId") {
@@ -159,16 +159,16 @@ if (name === "categoryId") {
       return;
     }
 
-   const numeric = ["price", "offerPrice", "stock", "rating", "taxAmount", "deliveryCharges"];
+    const numeric = ["price", "offerPrice", "stock", "rating", "taxAmount", "deliveryCharges"];
 
-setForm((p) => ({
-  ...p,
-  [name]: numeric.includes(name)
-    ? value === ""
-      ? ""
-      : Number(value)
-    : value,
-}));
+    setForm((p) => ({
+      ...p,
+      [name]: numeric.includes(name)
+        ? value === ""
+          ? ""
+          : Number(value)
+        : value,
+    }));
   };
 
   const [useImageUpload, setUseImageUpload] = useState(true);
@@ -181,7 +181,7 @@ setForm((p) => ({
   const [videoUrlsText, setVideoUrlsText] = useState("");
 
   const [isUploading, setIsUploading] = useState(false);
- 
+
 
   const splitUrls = (txt) =>
     txt
@@ -243,7 +243,7 @@ setForm((p) => ({
     <div className="modal show d-block" style={{ background: "rgba(0,0,0,0.6)" }}>
       <div className="modal-dialog modal-xl modal-dialog-centered">
         <div className="modal-content border-0 shadow-lg" style={{ borderRadius: "18px" }}>
-          
+
           <div className="modal-header py-3 bg-light">
             <h5 className="modal-title text-primary fw-bold fs-4">Add Product</h5>
             <button className="btn-close" onClick={onClose}></button>
@@ -313,85 +313,81 @@ setForm((p) => ({
                 </div>
               </div>
 
-      <div className="p-4 shadow-sm rounded-3 mb-4 bg-light">
-  <h6 className="text-primary fw-bold mb-3">
-    Category, Subcategory & Brand
-  </h6>
+              <div className="p-4 shadow-sm rounded-3 mb-4 bg-light">
+                <h6 className="text-primary fw-bold mb-3">
+                  Category, Subcategory & Brand
+                </h6>
 
-  <div className="row g-3">
-
-
- <div className="col-md-4">
-  <label className="form-label">Brand</label>
-  <select
-    className="form-select"
-    name="brandId"
-    value={form.brandId}
-    onChange={(e) => {
-      const b = brands.find((x) => x.id === e.target.value);
-      setForm((p) => ({
-        ...p,
-        brandId: b?.id || "",
-        brandName: b?.name || "",
-      }));
-    }}
-  >
-    <option value="">Select Brand</option>
-    {brands.map((b) => (
-      <option key={b.id} value={b.id}>
-        {b.name}
-      </option>
-    ))}
-  </select>
-</div>
-    {/* CATEGORY */}
-    <div className="col-md-4">
-      <label className="form-label">Category</label>
-      <select
-        className="form-select"
-        name="categoryId"
-        value={form.categoryId}
-        onChange={handleChange}
-      >
-        <option value="">Select Category</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-    </div>
-
-    {/* SUBCATEGORY */}
-    <div className="col-md-4">
-  <label className="form-label">Subcategory</label>
-  <select
-    className="form-select"
-    value={form.subCategoryId}
-    onChange={(e) => {
-      const sub = subCategories.find((s) => s.id === e.target.value);
-      setForm((p) => ({
-        ...p,
-        subCategoryId: sub?.id || "",
-        subCategoryName: sub?.name || "",
-      }));
-    }}
-  >
-    <option value="">Select Subcategory</option>
-    {subCategories.map((s) => (
-      <option key={s.id} value={s.id}>
-        {s.name}
-      </option>
-    ))}
-  </select>
-</div>
-
-  {/* BRAND */}
+                <div className="row g-3">
 
 
+                  <div className="col-md-4">
+                    <label className="form-label">Brand</label>
+                    <select
+                      className="form-select"
+                      name="brandId"
+                      value={form.brandId}
+                      onChange={(e) => {
+                        const b = brands.find((x) => x.id === e.target.value);
+                        setForm((p) => ({
+                          ...p,
+                          brandId: b?.id || "",
+                          brandName: b?.name || "",
+                        }));
+                      }}
+                    >
+                      <option value="">Select Brand</option>
+                      {brands.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* CATEGORY */}
+                  <div className="col-md-4">
+                    <label className="form-label">Category</label>
+                    <select
+                      className="form-select"
+                      name="categoryId"
+                      value={form.categoryId}
+                      onChange={handleChange}
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-  </div>
-</div>
+                  {/* SUBCATEGORY */}
+                  <div className="col-md-4">
+                    <label className="form-label">Subcategory</label>
+                    <select
+                      className="form-select"
+                      value={form.subCategoryId}
+                      onChange={(e) => {
+                        const sub = subCategories.find((s) => s.id === e.target.value);
+                        setForm((p) => ({
+                          ...p,
+                          subCategoryId: sub?.id || "",
+                          subCategoryName: sub?.name || "",
+                        }));
+                      }}
+                    >
+                      <option value="">Select Subcategory</option>
+                      {subCategories.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                </div>
+              </div>
 
 
 
@@ -421,16 +417,6 @@ setForm((p) => ({
                     />
                   </div>
 
-                  <div className="col-md-4">
-                    <label className="form-label">Tax (%)</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      name="taxAmount"
-                      value={form.taxAmount}
-                      onChange={handleChange}
-                    />
-                  </div>
 
                   <div className="col-md-4">
                     <label className="form-label">Rating (0-5)</label>
@@ -542,16 +528,6 @@ setForm((p) => ({
 
                 <div className="row g-3">
 
-                  <div className="col-md-4">
-                    <label className="form-label">Delivery Charges</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      name="deliveryCharges"
-                      value={form.deliveryCharges}
-                      onChange={handleChange}
-                    />
-                  </div>
 
                   <div className="col-md-4">
                     <label className="form-label">Product Code</label>
