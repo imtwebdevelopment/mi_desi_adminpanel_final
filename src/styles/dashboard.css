@@ -1,0 +1,148 @@
+/* ------------------------------------------------------ */
+/* GLOBAL PAGE BACKGROUND                                 */
+/* ------------------------------------------------------ */
+
+.flex-fill.bg-light {
+    /* Soft, professional off-white background */
+    background: linear-gradient(135deg, #f7f9fc, #edf2f7);
+    min-height: 100vh;
+    margin-top: 90px;
+    padding: 20px;
+}
+
+
+/* ------------------------------------------------------ */
+/* INITIAL CARD ANIMATION                                 */
+/* ------------------------------------------------------ */
+
+@keyframes card-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stat-card-animated {
+    animation: card-fade-in 0.6s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    opacity: 0; /* Start hidden for the animation */
+}
+
+
+/* ------------------------------------------------------ */
+/* CARD HOVER + ANIMATION (Enhanced)                      */
+/* ------------------------------------------------------ */
+
+.animate-hover-lift {
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    border-radius: 18px;
+    will-change: transform, box-shadow;
+}
+
+.animate-hover-lift:hover {
+    /* Increased lift and shadow for a very clear "pop" effect */
+    transform: translateY(-12px);
+    box-shadow: 0 20px 45px rgba(28, 52, 100, 0.30); /* Darker shadow */
+}
+
+
+/* ------------------------------------------------------ */
+/* GRADIENT BACKGROUND FOR EACH CARD (DEEP & VIBRANT)     */
+/* ------------------------------------------------------ */
+
+.stat-card-primary {
+    /* Deep Indigo Gradient */
+    background: linear-gradient(135deg, #2c3e50, #4e54c8);
+}
+
+.stat-card-warning {
+    /* Rich Gold/Brown Gradient */
+    background: linear-gradient(135deg, #a8781d, #c5a65c);
+}
+
+.stat-card-danger {
+    /* Deep Scarlet Gradient */
+    background: linear-gradient(135deg, #c0392b, #e74c3c);
+}
+
+.stat-card-success {
+    /* Deep Emerald Gradient */
+    background: linear-gradient(135deg, #0d9488, #10b981);
+}
+
+.stat-card-info {
+    /* Deep Blue/Cyan Gradient */
+    background: linear-gradient(135deg, #3498db, #2980b9);
+}
+
+
+/* ------------------------------------------------------ */
+/* TEXT COLOR FIX FOR DARK CARDS (Refined Off-White)      */
+/* ------------------------------------------------------ */
+
+/* Target the text elements directly inside the dark cards and set color to off-white */
+.stat-card-primary h2, .stat-card-primary p,
+.stat-card-warning h2, .stat-card-warning p,
+.stat-card-danger h2, .stat-card-danger p,
+.stat-card-success h2, .stat-card-success p,
+.stat-card-info h2, .stat-card-info p {
+    /* Use off-white for better visual appeal on dark backgrounds */
+    color: #f8f9fa !important; 
+}
+
+
+/* ------------------------------------------------------ */
+/* ICON BUBBLE BEAUTIFIED (To contrast dark cards)        */
+/* ------------------------------------------------------ */
+
+/* Icons are now bright colors to stand out on the dark cards */
+.icon-primary { background: #6366f1; color: #ffffff; } /* Bright Indigo */
+.icon-warning { background: #f59e0b; color: #ffffff; } /* Bright Gold */
+.icon-danger  { background: #ef4444; color: #ffffff; } /* Bright Red */
+.icon-success { background: #34d399; color: #ffffff; } /* Bright Mint */
+.icon-info    { background: #38bdf8; color: #ffffff; } /* Bright Sky Blue */
+
+.icon-primary:hover,
+.icon-warning:hover,
+.icon-danger:hover,
+.icon-success:hover,
+.icon-info:hover {
+    transform: scale(1.18); 
+    color: #ffffff !important;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.25);
+}
+
+
+/* ------------------------------------------------------ */
+/* CHART STYLING (For contrast against dark cards)        */
+/* ------------------------------------------------------ */
+
+.chart-card {
+    /* Pure white background with a modern, substantial shadow */
+    background: #ffffff;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
+    border-radius: 18px;
+}
+
+.chart-container {
+    background: #ffffff; 
+    padding: 10px 0; 
+    border-radius: 12px;
+}
+
+
+/* ------------------------------------------------------ */
+/* TITLES                                                 */
+/* ------------------------------------------------------ */
+
+.card-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #111827; /* Dark text for the light chart cards */
+    margin-bottom: 1.5rem !important;
+    letter-spacing: -0.5px;
+}

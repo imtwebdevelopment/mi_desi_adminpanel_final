@@ -1,0 +1,137 @@
+/* ------------------------------------------- */
+/* --- SIDEBAR STYLING (Responsive & Clean) --- */
+/* ------------------------------------------- */
+
+.sidebar-container {
+  background: #ffffff;
+  border-radius: 0 10px 10px 0;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+  transition: width 0.3s ease-out, transform 0.3s ease-out;
+  width: 300px;
+  z-index: 1000;
+  border-right: 1px solid #f0f0f0;
+  position: sticky;          /* 👈 Sticks to top */
+  top: 0;                    /* 👈 Stay fixed to top edge */
+  height: 100vh;             /* Full viewport height */
+  overflow-y: auto;          /* Scroll inside if needed */
+  overflow-x: hidden;
+}
+
+/* Scrollbar Styling */
+.sidebar-container::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-container::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
+}
+.sidebar-container::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Collapsed Sidebar (Desktop only collapse behavior) */
+.sidebar-container.collapsed {
+  width: 70px;
+}
+
+/* Hide text elements smoothly when collapsed */
+.sidebar-container.collapsed .text-dark,
+.sidebar-container.collapsed .text-uppercase,
+.sidebar-container.collapsed .mt-auto,
+.sidebar-container.collapsed .nav-link:not(.active) span.me-2 + * {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease-out 0s;
+}
+
+/* Smooth transitions for all elements */
+.sidebar-container * {
+  transition: all 0.3s ease-out;
+}
+
+/* Sidebar Header Logo */
+.sidebar-container span.fs-4 {
+  font-weight: 800;
+  color: #4f46e5;
+}
+
+/* Sidebar Links */
+.nav-link {
+  border-radius: 8px;
+  font-weight: 500;
+  color: #4b5563;
+  padding: 0.75rem 0.8rem !important;
+  display: flex;
+  align-items: center;
+}
+
+/* Hover State */
+.nav-link:hover {
+  background-color: #f3f4f6;
+  color: #4f46e5 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Active Link Styling */
+.nav-link.active {
+  background: #4f46e5;
+  color: #fff !important;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+  transform: scale(1.02);
+  border: none;
+}
+
+/* Sidebar Icons */
+.sidebar-icon {
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.nav-link:hover .sidebar-icon {
+  transform: scale(1.1);
+  color: #4f46e5;
+}
+
+/* Sidebar Section Title */
+.text-uppercase.text-muted {
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+  color: #9ca3af !important;
+}
+
+/* Sidebar Footer */
+.mt-auto.pt-3 {
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #6b7280;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Offcanvas (Mobile Sidebar) */
+.offcanvas-body {
+  background: #ffffff;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 991px) {
+  .sidebar-container {
+    position: fixed;
+    height: 100%;
+    width: 240px;
+    top: 0;
+    left: 0;
+    border-radius: 0;
+    z-index: 1050;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar-container.collapsed {
+    width: 240px;
+  }
+}
